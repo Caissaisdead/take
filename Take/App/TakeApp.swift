@@ -46,7 +46,7 @@ struct TakeApp: App {
                     .keyboardShortcut("3", modifiers: [.command, .option])
                     .disabled(model.selection == nil || model.isWritingTakes)
                 Button("Mark Milestone…") { model.naming = .milestone }
-                    .keyboardShortcut("m", modifiers: .command)
+                    .keyboardShortcut("m", modifiers: [.command, .shift])
                     .disabled(model.manuscript.scenes.isEmpty)
                 Divider()
                 Button("Reveal in Finder") { model.revealInFinder() }

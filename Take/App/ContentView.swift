@@ -64,7 +64,7 @@ struct ContentView: View {
                 Button("New Take") { model.naming = .take }
                     .disabled(model.selection == nil)
                 Button("Milestone", systemImage: "flag") { model.naming = .milestone }
-                    .help("Mark the whole draft as it stands (⌘M)")
+                    .help("Mark the whole draft as it stands (⇧⌘M)")
                     .disabled(model.manuscript.scenes.isEmpty)
                 if model.isInTake {
                     Button("Keep") { model.keep() }
