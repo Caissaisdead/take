@@ -365,6 +365,59 @@ public final class Repository {
         return MergeFileResult(isAutomergeable: result.automergeable != 0, content: content)
     }
 
+    // MARK: - Remote
+
+    /// What a push learnt from the other end: refs it turned away.
+    private final class PushState {
+        let token: String?
+        var asked = false
+        var rejected: [String] = []
+
+        init(token: String?) { self.token = token }
+    }
+
+    /// Pushes `refspecs` to `url`, answering a request for credentials with
+    /// `token` as the password under a nominal user name, which is how the
+    /// hosting services take a personal access token. A second request means
+    /// the first was refused. A ref the remote turns away (main having moved
+    /// there, say) fails the push with the remote's reason. Blocks for the
+    /// length of the transfer; call it off the main thread on its own
+    /// `Repository`.
+    public func push(to url: String, refspecs: [String], token: String?) throws {
+        let remote = try lookup("git_remote_create_anonymous") { git_remote_create_anonymous($0, pointer, url) }
+        defer { git_remote_free(remote) }
+
+        var options = git_push_options()
+        try check(git_push_options_init(&options, UInt32(GIT_PUSH_OPTIONS_VERSION)), "git_push_options_init")
+        let state = PushState(token: token)
+        options.callbacks.payload = Unmanaged.passUnretained(state).toOpaque()
+        options.callbacks.credentials = { out, _, _, _, payload in
+            guard let payload else { return GIT_EAUTH.rawValue }
+            let state = Unmanaged<PushState>.fromOpaque(payload).takeUnretainedValue()
+            guard let token = state.token, !state.asked else { return GIT_EAUTH.rawValue }
+            state.asked = true
+            return git_credential_userpass_plaintext_new(out, "token", token)
+        }
+        options.callbacks.push_update_reference = { refname, status, payload in
+            guard let status, let payload else { return 0 }
+            let state = Unmanaged<PushState>.fromOpaque(payload).takeUnretainedValue()
+            let name = refname.map { String(cString: $0) } ?? "?"
+            state.rejected.append("\(name): \(String(cString: status))")
+            return 0
+        }
+
+        var strings = refspecs.map { strdup($0) }
+        defer { strings.forEach { free($0) } }
+        try strings.withUnsafeMutableBufferPointer { buffer in
+            var array = git_strarray(strings: buffer.baseAddress, count: buffer.count)
+            try check(git_remote_push(remote, &array, &options), "git_remote_push")
+        }
+        withExtendedLifetime(state) {}
+        if !state.rejected.isEmpty {
+            throw GitError(operation: "git_remote_push", code: -1, message: "the remote turned away " + state.rejected.joined(separator: "; "))
+        }
+    }
+
     // MARK: - Lookups
 
     private func lookupTree(_ id: ObjectID) throws -> OpaquePointer {

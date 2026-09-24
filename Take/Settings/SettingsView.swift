@@ -3,8 +3,12 @@ import SwiftUI
 /// Settings: the Anthropic key and model, and what leaves the Mac. The key
 /// goes to the keychain the moment it is saved and is never shown again.
 struct SettingsView: View {
+    @Environment(ProjectModel.self) private var model
     @State private var key = ""
     @State private var hasKey = APIKeyStore.read() != nil
+    @State private var remote = ""
+    @State private var token = ""
+    @State private var hasToken = KeychainItem.backupToken.read() != nil
     @State private var model = ClaudeClient.model
     @State private var check = ""
     @State private var checking = false
@@ -57,16 +61,59 @@ struct SettingsView: View {
             }
 
             Section {
+                TextField("Remote URL", text: $remote, prompt: Text("https://github.com/you/novel.git"))
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.backupRemote = remote }
+                HStack {
+                    SecureField("Access token", text: $token, prompt: Text(hasToken ? "Saved; enter a new one to replace it" : "A personal access token with push rights"))
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(saveToken)
+                    Button("Save", action: saveToken)
+                        .disabled(token.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                HStack {
+                    Button("Back Up Now") {
+                        model.backupRemote = remote
+                        model.backUp()
+                    }
+                    .disabled(remote.trimmingCharacters(in: .whitespaces).isEmpty || model.isBackingUp)
+                    if model.isBackingUp { ProgressView().controlSize(.small) }
+                    Spacer()
+                    if hasToken {
+                        Button("Remove Token") {
+                            KeychainItem.backupToken.write("")
+                            hasToken = false
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            } header: {
+                Text("Backup of \(model.projectName)")
+            } footer: {
+                Text("Draft > Back Up pushes main, the milestones and every take to this remote over HTTPS with the token, which lives in the keychain. The remote is kept per project. A remote that has changes this Mac lacks is left as it is.")
+            }
+
+            Section {
                 Toggle("Ask before each send", isOn: $alwaysAsk)
             } header: {
                 Text("What leaves the Mac")
             } footer: {
-                Text("Untangle runs on Apple's on-device model and sends nothing. Three Takes sends the open scene, the scenes on either side of it, and the Untangle beat sheet if there is one, to Anthropic under your key. Nothing else ever leaves.")
+                Text("Untangle runs on Apple's on-device model and sends nothing. Three Takes sends the open scene, the scenes on either side of it, and the Untangle beat sheet if there is one, to Anthropic under your key. Back Up sends the whole project to the remote you name. Nothing else ever leaves.")
             }
         }
         .formStyle(.grouped)
         .frame(width: 520)
         .padding()
+        .onAppear { remote = model.backupRemote }
+        .onChange(of: model.backupVersion) { remote = model.backupRemote }
+        .onDisappear { model.backupRemote = remote }
+    }
+
+    private func saveToken() {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        hasToken = KeychainItem.backupToken.write(trimmed)
+        token = ""
     }
 
     private func save() {

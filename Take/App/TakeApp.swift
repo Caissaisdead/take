@@ -59,6 +59,9 @@ struct TakeApp: App {
                 Button("Targets…") { model.showTargets = true }
                     .disabled(model.manuscript.scenes.isEmpty)
                 Divider()
+                Button("Back Up") { model.backUp() }
+                    .keyboardShortcut("b", modifiers: [.command, .shift])
+                    .disabled(model.backupRemote.isEmpty || model.isBackingUp)
                 Button("Reveal in Finder") { model.revealInFinder() }
                 Button("Open in Terminal") { model.openInTerminal() }
                     .keyboardShortcut("t", modifiers: [.command, .option])
@@ -74,6 +77,7 @@ struct TakeApp: App {
         }
         Settings {
             SettingsView()
+                .environment(model)
         }
     }
 }

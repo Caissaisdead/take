@@ -763,6 +763,43 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func backupPushesEveryRefToARemote() throws {
+        try withTemporaryDirectory { url in
+            let project = url.appendingPathComponent("project")
+            let bare = url.appendingPathComponent("remote.git")
+            try FileManager.default.createDirectory(at: bare, withIntermediateDirectories: true)
+            _ = try git("init", "--bare", "--quiet", in: bare)
+
+            let store = try ProjectStore.create(at: project, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "Base.\n")
+            let milestone = try store.milestone(named: "First")
+            let take = try store.saveTake(try store.createTake(for: scene.id, name: "Alt"), text: "Alt.\n")
+            try store.discard(take)
+            let kept = try store.saveTake(try store.createTake(for: scene.id, name: "Keep me"), text: "Kept.\n")
+
+            try ProjectStore.backUp(projectAt: project, to: "file://" + bare.path, token: nil)
+            let refs = try git("for-each-ref", "--format=%(refname)", in: bare).split(separator: "\n").map(String.init)
+            #expect(refs.contains("refs/heads/main"))
+            #expect(refs.contains(milestone.id))
+            #expect(refs.contains(kept.id))
+            #expect(refs.contains { $0.hasPrefix("refs/discarded/") })
+            #expect(try git("rev-parse", "refs/heads/main", in: bare).trimmingCharacters(in: .whitespacesAndNewlines) == (try store.mainHead().hex))
+
+            // Again after a change: main moves on the remote too.
+            try store.checkpoint(scene.id, text: "Moved.\n")
+            try ProjectStore.backUp(projectAt: project, to: "file://" + bare.path, token: nil)
+            #expect(try git("rev-parse", "refs/heads/main", in: bare).trimmingCharacters(in: .whitespacesAndNewlines) == (try store.mainHead().hex))
+
+            // The remote has moved on its own: main is turned away, not overwritten.
+            let elsewhere = url.appendingPathComponent("elsewhere")
+            _ = try git("clone", "--quiet", bare.path, elsewhere.path, in: url)
+            _ = try git("-c", "user.name=Other", "-c", "user.email=o@example.com", "commit", "--allow-empty", "-m", "Elsewhere", "--quiet", in: elsewhere)
+            _ = try git("push", "--quiet", "origin", "main", in: elsewhere)
+            try store.checkpoint(scene.id, text: "Moved again.\n")
+            #expect(throws: GitError.self) { try ProjectStore.backUp(projectAt: project, to: "file://" + bare.path, token: nil) }
+        }
+    }
+
     @Test func systemGitReadsTheProject() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "Pride and Prejudice", author: jane)

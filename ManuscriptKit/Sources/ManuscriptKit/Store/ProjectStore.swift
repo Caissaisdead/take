@@ -408,6 +408,24 @@ public final class ProjectStore {
         return Array(versions.prefix(limit))
     }
 
+    // MARK: - Backup
+
+    /// Everything a backup carries: main, the milestones, the takes and the
+    /// discarded takes. Main is not forced, so a remote that has moved on is
+    /// reported rather than overwritten.
+    public static let backupRefspecs = [
+        "refs/heads/main:refs/heads/main",
+        "refs/tags/milestones/*:refs/tags/milestones/*",
+        "refs/takes/*:refs/takes/*",
+        "refs/discarded/*:refs/discarded/*",
+    ]
+
+    /// Pushes the project to `url`. Opens its own repository so it can run
+    /// on any thread while the store's own stays where it is.
+    public static func backUp(projectAt folder: URL, to url: String, token: String?) throws {
+        try Repository.open(at: folder).push(to: url, refspecs: backupRefspecs, token: token)
+    }
+
     // MARK: - Since
 
     /// Every scene against how the draft stood at `commit`: the words added
