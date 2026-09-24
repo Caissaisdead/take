@@ -35,6 +35,7 @@ struct ContentView: View {
     @State private var compareDiff: ProseDiff?
     @State private var compareRefresh: Task<Void, Never>?
     @State private var confirmDiscard = false
+    @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
 
     var body: some View {
         @Bindable var model = model
@@ -184,6 +185,7 @@ struct ContentView: View {
                 compareDiff = model.compare()
             }
         }
+        .tint((Accent(rawValue: accentName) ?? .blue).color)
         .frame(minWidth: 900, minHeight: 560)
         .navigationTitle(model.projectName)
         .navigationSubtitle((model.projectURL?.deletingLastPathComponent().path(percentEncoded: false) as NSString?)?.abbreviatingWithTildeInPath ?? "")

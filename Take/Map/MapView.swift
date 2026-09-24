@@ -6,6 +6,8 @@ import ManuscriptKit
 /// Clicking a node opens it in the editor.
 struct MapView: View {
     @Environment(ProjectModel.self) private var model
+    @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
+    private var accent: Color { (Accent(rawValue: accentName) ?? .blue).color }
     @State private var columns: [ProjectModel.MapColumn] = []
 
     private let columnWidth: CGFloat = 270
@@ -143,16 +145,18 @@ struct MapView: View {
                 stub.addLine(to: CGPoint(x: to.x - nodeSize.width / 2, y: to.y))
                 let faded: Bool
                 if case .discarded = take.kind { faded = true } else { faded = false }
-                context.stroke(stub, with: .color(faded ? .secondary.opacity(0.35) : .accentColor),
+                context.stroke(stub, with: .color(faded ? .secondary.opacity(0.35) : accent),
                                style: StrokeStyle(lineWidth: 1.5, dash: faded ? [3, 3] : []))
                 let dot = Path(ellipseIn: CGRect(x: x - 3.5, y: to.y - 3.5, width: 7, height: 7))
-                context.fill(dot, with: .color(faded ? .secondary.opacity(0.5) : .accentColor))
+                context.fill(dot, with: .color(faded ? .secondary.opacity(0.5) : accent))
             }
         }
     }
 }
 
 private struct NodeView: View {
+    @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
+    private var accent: Color { (Accent(rawValue: accentName) ?? .blue).color }
     let node: ProjectModel.MapNode
     let isOpen: Bool
 
@@ -174,7 +178,7 @@ private struct NodeView: View {
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(background, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(isOpen ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: isOpen ? 2 : 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(isOpen ? accent : Color.secondary.opacity(0.3), lineWidth: isOpen ? 2 : 1))
         .opacity(faded ? 0.55 : 1)
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .help(help)
@@ -196,7 +200,7 @@ private struct NodeView: View {
     private var tint: Color {
         switch node.kind {
         case .main: return .primary
-        case .take: return .accentColor
+        case .take: return accent
         case .discarded: return .secondary
         }
     }
@@ -204,7 +208,7 @@ private struct NodeView: View {
     private var background: Color {
         switch node.kind {
         case .main: return Color(nsColor: .controlBackgroundColor)
-        case .take: return Color.accentColor.opacity(0.08)
+        case .take: return accent.opacity(0.08)
         case .discarded: return Color(nsColor: .controlBackgroundColor)
         }
     }
