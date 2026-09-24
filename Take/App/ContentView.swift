@@ -165,7 +165,8 @@ private struct DetailView: View {
                     loadToken: model.loadToken,
                     onChange: { model.textChanged() },
                     onLoad: { model.recordLoad(millis: $0) },
-                    onReady: { model.editorReady($0) }
+                    onReady: { model.editorReady($0) },
+                    onDismantle: { model.editorGone(text: $0) }
                 )
             }
             Divider()

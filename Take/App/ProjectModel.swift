@@ -117,6 +117,15 @@ final class ProjectModel {
         if store == nil {
             open(Self.sampleFolder, seedingSample: true)
         }
+        // The idle save waits ten seconds; a quit inside them must not lose
+        // the text. The notice is posted on the main thread, before any
+        // window goes, so the save runs whole.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isDirty else { return }
+                self.save()
+            }
+        }
     }
 
     /// The window's name: the manuscript's title, or the folder's.
@@ -222,6 +231,15 @@ final class ProjectModel {
     /// The loaded text plus whatever has been typed since.
     var currentText: String {
         readEditor?() ?? editorText
+    }
+
+    /// The editor's last text, handed over as its view goes away (the window
+    /// closing, or no scene left open), so `currentText` stays what the writer
+    /// saw. Taken only while dirty: a clean editor's text is already here, and
+    /// after a removal it would be the removed scene's.
+    func editorGone(text: String) {
+        readEditor = nil
+        if isDirty { editorText = text }
     }
 
     var sceneTitle: String {

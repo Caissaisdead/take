@@ -13,6 +13,9 @@ struct EditorView: NSViewRepresentable {
     var onLoad: (_ millis: Double) -> Void = { _ in }
     /// Receives the text view once it exists, for the in-app bench.
     var onReady: (ProseTextView) -> Void = { _ in }
+    /// Receives the text as the view is taken down, so nothing typed is
+    /// lost with it.
+    var onDismantle: (String) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -48,6 +51,11 @@ struct EditorView: NSViewRepresentable {
         guard let textView = coordinator.textView, coordinator.loadedToken != loadToken else { return }
         coordinator.loadedToken = loadToken
         textView.setText(text)
+    }
+
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        guard let textView = coordinator.textView else { return }
+        coordinator.parent.onDismantle(textView.string)
     }
 
     final class Coordinator {
