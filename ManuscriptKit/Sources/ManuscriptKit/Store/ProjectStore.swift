@@ -408,6 +408,48 @@ public final class ProjectStore {
         return Array(versions.prefix(limit))
     }
 
+    // MARK: - Since
+
+    /// Every scene against how the draft stood at `commit`: the words added
+    /// and removed since, in manuscript order, with the scenes gone since
+    /// listed last in their old order. A scene that moved or was renamed but
+    /// whose text did not change reads as the same.
+    public func changes(since commit: ObjectID) throws -> [SceneChange] {
+        let now = try manifest()
+        let then = try manifest(at: commit)
+        let oldTree = try repository.commit(commit).tree
+        let newTree = try repository.commit(try mainHead()).tree
+        let thenScenes = Set(then.scenes.map(\.id))
+        var changes: [SceneChange] = []
+        for chapter in now.chapters {
+            for scene in chapter.scenes {
+                let newEntry = try repository.entry(atPath: scene.path, inTree: newTree)
+                let newText = try text(of: newEntry?.id)
+                guard thenScenes.contains(scene.id) else {
+                    changes.append(SceneChange(scene: scene, chapter: chapter.id, kind: .added, wordsAdded: Prose.wordCount(Prose.withoutNotes(newText)), wordsRemoved: 0))
+                    continue
+                }
+                let oldEntry = try repository.entry(atPath: scene.path, inTree: oldTree)
+                if oldEntry?.id == newEntry?.id {
+                    changes.append(SceneChange(scene: scene, chapter: chapter.id, kind: .same, wordsAdded: 0, wordsRemoved: 0))
+                    continue
+                }
+                let summary = ProseDiffer.diff(old: Prose.withoutNotes(try text(of: oldEntry?.id)), new: Prose.withoutNotes(newText)).summary
+                let kind: SceneChange.Kind = summary.paragraphsChanged == 0 ? .same : .changed
+                changes.append(SceneChange(scene: scene, chapter: chapter.id, kind: kind, wordsAdded: summary.wordsAdded, wordsRemoved: summary.wordsRemoved))
+            }
+        }
+        let nowScenes = Set(now.scenes.map(\.id))
+        for chapter in then.chapters {
+            for scene in chapter.scenes where !nowScenes.contains(scene.id) {
+                let oldEntry = try repository.entry(atPath: scene.path, inTree: oldTree)
+                let words = Prose.wordCount(Prose.withoutNotes(try text(of: oldEntry?.id)))
+                changes.append(SceneChange(scene: scene, chapter: chapter.id, kind: .removed, wordsAdded: 0, wordsRemoved: words))
+            }
+        }
+        return changes
+    }
+
     // MARK: - Counting
 
     /// Words per scene, notes left out, at `commit` or at main's head.

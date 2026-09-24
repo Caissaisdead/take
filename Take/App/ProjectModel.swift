@@ -1082,6 +1082,25 @@ final class ProjectModel {
         }
     }
 
+    /// Every scene against the milestone. Diffs run here, so call it when the
+    /// view shows, not on every keystroke.
+    func changes(since milestone: Milestone) -> [SceneChange] {
+        guard let store else { return [] }
+        do {
+            return try store.changes(since: milestone.commit)
+        } catch {
+            statusLine = "Since failed: \(error.localizedDescription)"
+            return []
+        }
+    }
+
+    /// Opens the scene on main, compared against the milestone.
+    func open(_ scene: SceneID, against milestone: Milestone) {
+        select(.main(scene))
+        guard selection == .main(scene) else { return }
+        compareBase = .milestone(milestone.id)
+    }
+
     /// Takes the compared side of one paragraph into the editor: a changed
     /// paragraph goes back to how the base has it, a removed one comes back,
     /// an added one goes. Unsaved, like any edit; the idle save follows.

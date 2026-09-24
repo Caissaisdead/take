@@ -180,6 +180,31 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func changesSinceACommitCountEveryScene() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let a = try store.addChapter(title: "A", toPart: nil)
+            let same = try store.addScene(title: "Same", toChapter: a.id, text: "Stays as it is.\n")
+            let edited = try store.addScene(title: "Edited", toChapter: a.id, text: "One two three four.\n")
+            let gone = try store.addScene(title: "Gone", toChapter: a.id, text: "Five six.\n")
+            let milestone = try store.milestone(named: "Draft")
+
+            try store.checkpoint(edited.id, text: "One two three four five six [[note]].\n")
+            try store.remove(scene: gone.id)
+            try store.rename(scene: same.id, to: "Same, renamed")
+            let added = try store.addScene(title: "Added", toChapter: a.id, text: "Seven eight nine.\n")
+
+            let changes = try store.changes(since: milestone.commit)
+            #expect(changes.map(\.scene.id) == [same.id, edited.id, added.id, gone.id])
+            #expect(changes.map(\.kind) == [.same, .changed, .added, .removed])
+            #expect(changes.map(\.wordsAdded) == [0, 2, 3, 0])
+            #expect(changes.map(\.wordsRemoved) == [0, 0, 0, 2])
+            #expect(changes[0].scene.title == "Same, renamed")
+            #expect(changes.allSatisfy { $0.chapter == a.id })
+            #expect(try store.changes(since: try store.mainHead()).allSatisfy { $0.kind == .same })
+        }
+    }
+
     @Test func removedScenesAreListedAndComeBackWhole() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
