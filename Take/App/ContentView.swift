@@ -53,11 +53,6 @@ struct ContentView: View {
                     UntangleView()
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .showUntangle)) { _ in
-                inspectorTab = .untangle
-                showInspector = true
-                model.untangle()
-            }
             .inspectorColumnWidth(min: 280, ideal: inspectorTab == .compare ? 460 : 300, max: 900)
         }
         .toolbar {
@@ -107,6 +102,13 @@ struct ContentView: View {
             Button("Discard Take", role: .destructive) { model.discard() }
         } message: {
             Text("It moves to the scene's discarded list, where Restore brings it back. Unsaved edits are dropped.")
+        }
+        // On the split view, not the inspector's content: a closed inspector
+        // has no content to hear the menu.
+        .onReceive(NotificationCenter.default.publisher(for: .showUntangle)) { _ in
+            inspectorTab = .untangle
+            showInspector = true
+            model.untangle()
         }
         .onChange(of: comparing) { _, shown in
             if shown { compareDiff = model.compare() }
