@@ -2,7 +2,7 @@ import SwiftUI
 import ManuscriptKit
 
 struct ContentView: View {
-    enum InspectorTab: Hashable { case versions, compare }
+    enum InspectorTab: Hashable { case versions, compare, untangle }
 
     @Environment(ProjectModel.self) private var model
     @State private var showInspector = true
@@ -29,6 +29,7 @@ struct ContentView: View {
                 Picker("Inspector", selection: $inspectorTab) {
                     Text("Versions").tag(InspectorTab.versions)
                     Text("Compare").tag(InspectorTab.compare)
+                    Text("Untangle").tag(InspectorTab.untangle)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -48,7 +49,14 @@ struct ContentView: View {
                     .disabled(model.selection == nil)
                     CompareView(diff: compareDiff)
                         .equatable()
+                case .untangle:
+                    UntangleView()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showUntangle)) { _ in
+                inspectorTab = .untangle
+                showInspector = true
+                model.untangle()
             }
             .inspectorColumnWidth(min: 280, ideal: inspectorTab == .compare ? 460 : 300, max: 900)
         }
@@ -333,4 +341,9 @@ private struct ConflictSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
+
+extension Notification.Name {
+    /// Draft > Untangle: open the pane and run it.
+    static let showUntangle = Notification.Name("TakeShowUntangle")
 }

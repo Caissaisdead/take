@@ -256,6 +256,12 @@ final class ProjectModel {
             case .main(let id): text = try store.sceneText(id)
             case .take(let take): text = try store.takeText(take)
             }
+            if selection?.sceneID != target.sceneID {
+                untangling = nil
+                untangleError = nil
+                untangleTask?.cancel()
+                isUntangling = false
+            }
             selection = target
             compareBase = .automatic
             setEditorText(text, dirty: false)
@@ -567,6 +573,40 @@ final class ProjectModel {
             select(.take(take))
         case .discarded(let take):
             restore(discarded: take)
+        }
+    }
+
+    // MARK: - Untangle
+
+    private(set) var untangling: Untangling?
+    private(set) var untangleError: String?
+    private(set) var isUntangling = false
+    @ObservationIgnored private var untangleTask: Task<Void, Never>?
+    @ObservationIgnored private let untangler = Untangler()
+
+    var untangleUnavailable: String? { untangler.unavailableReason }
+
+    /// Runs Untangle on the open scene's current text. The result is kept
+    /// until another scene opens or it runs again.
+    func untangle() {
+        guard selection != nil, !isUntangling else { return }
+        let title = sceneTitle
+        let text = currentText
+        isUntangling = true
+        untangleError = nil
+        untangleTask?.cancel()
+        untangleTask = Task {
+            do {
+                let result = try await untangler.untangle(scene: title, text: text)
+                guard !Task.isCancelled else { return }
+                untangling = result
+                statusLine = "Untangled \(title)"
+            } catch {
+                guard !Task.isCancelled else { return }
+                untangleError = error.localizedDescription
+                statusLine = "Untangle: \(error.localizedDescription)"
+            }
+            isUntangling = false
         }
     }
 

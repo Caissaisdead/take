@@ -39,6 +39,9 @@ struct TakeApp: App {
                 .disabled(model.manuscript.scenes.isEmpty)
             }
             CommandMenu("Draft") {
+                Button("Untangle This Scene") { NotificationCenter.default.post(name: .showUntangle, object: nil) }
+                    .keyboardShortcut("u", modifiers: .command)
+                    .disabled(model.selection == nil)
                 Button("Mark Milestone…") { model.naming = .milestone }
                     .keyboardShortcut("m", modifiers: .command)
                     .disabled(model.manuscript.scenes.isEmpty)
