@@ -174,6 +174,13 @@ private struct ChapterHeader: View {
                     }
                 }
                 Divider()
+                Menu("Export Chapter") {
+                    Button("Markdown Folder…") { model.export(.markdown, chapter: chapter.id) }
+                    Button("Word Document…") { model.export(.docx, chapter: chapter.id) }
+                    Button("PDF…") { model.export(.pdf, chapter: chapter.id) }
+                }
+                .disabled(chapter.scenes.isEmpty)
+                Divider()
                 Button("Remove Chapter…", role: .destructive) { removing = .chapter(chapter.id) }
             }
     }
