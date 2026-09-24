@@ -352,11 +352,11 @@ public final class ProjectStore {
     }
 
     /// Keeps the take: when main's copy of the scene is unchanged since the take
-    /// began, main gets the take's scene in a commit with two parents, the working
-    /// file is updated and the take's ref is removed. A take with no commits of its
-    /// own has nothing to merge, so only its ref is removed and main's head comes
-    /// back. Otherwise nothing is written and the three texts come back for the
-    /// writer to choose between.
+    /// began, main gets the take's scene in a commit with two parents, the scene's
+    /// working file alone is rewritten and the take's ref is removed. A take with
+    /// no commits of its own has nothing to merge, so only its ref is removed and
+    /// main's head comes back. Otherwise nothing is written and the three texts
+    /// come back for the writer to choose between.
     public func keep(_ take: Take) throws -> KeepResult {
         let scene = try sceneRef(take.scene)
         let head = try mainHead()
@@ -377,7 +377,9 @@ public final class ProjectStore {
         }
         let merged = try repository.tree(replacing: scene.path, with: takeEntry.id, in: mainTree)
         let commit = try repository.createCommit(tree: merged, parents: [head, take.head], author: stamp(), message: "Keep: \(take.name) - \(scene.title)", updatingRef: Self.mainRef)
-        try repository.checkoutHead()
+        // Only this file: anything else changed on disk by another tool is
+        // the writer's, not ours to reset.
+        try repository.writeWorkingFile(atPath: scene.path, data: try repository.readBlob(takeEntry.id))
         try repository.deleteRef(take.id)
         return .kept(commit)
     }
@@ -393,17 +395,21 @@ public final class ProjectStore {
         let mainTree = try repository.commit(head).tree
         let tree: ObjectID
         let verb: String
+        var written: ObjectID?
         switch side {
         case .take:
             guard let takeEntry = try entry(scene.path, at: take.head) else { throw ProjectStoreError.missingFile(scene.path) }
             tree = try repository.tree(replacing: scene.path, with: takeEntry.id, in: mainTree)
             verb = "Keep"
+            written = takeEntry.id
         case .main:
             tree = mainTree
             verb = "Keep main over"
         }
         let commit = try repository.createCommit(tree: tree, parents: [head, take.head], author: stamp(), message: "\(verb): \(take.name) - \(scene.title)", updatingRef: Self.mainRef)
-        try repository.checkoutHead()
+        if let written {
+            try repository.writeWorkingFile(atPath: scene.path, data: try repository.readBlob(written))
+        }
         try repository.deleteRef(take.id)
         return commit
     }

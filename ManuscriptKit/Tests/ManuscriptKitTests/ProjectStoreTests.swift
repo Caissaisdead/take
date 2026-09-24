@@ -407,6 +407,36 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func keepTouchesNoFileButTheScenes() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "Base.\n")
+            let other = try store.addScene(title: "Other", toChapter: nil, text: "Elsewhere.\n")
+            let take = try store.saveTake(try store.createTake(for: scene.id, name: "Alt"), text: "Alt.\n")
+
+            // Another tool has edited a scene on disk and left it uncommitted.
+            let edited = Data("Elsewhere, edited by hand.\n".utf8)
+            try edited.write(to: url.appendingPathComponent(other.path))
+
+            guard case .kept = try store.keep(take) else { Issue.record("keep did not merge"); return }
+            #expect(try Data(contentsOf: url.appendingPathComponent(scene.path)) == Data("Alt.\n".utf8))
+            #expect(try Data(contentsOf: url.appendingPathComponent(other.path)) == edited)
+            #expect(try git("status", "--porcelain", in: url) == " M \(other.path)\n")
+
+            // The same through a settled conflict, either way.
+            let second = try store.saveTake(try store.createTake(for: scene.id, name: "Second"), text: "Second.\n")
+            try store.checkpoint(scene.id, text: "Moved.\n")
+            try store.keep(second, choosing: .take)
+            #expect(try Data(contentsOf: url.appendingPathComponent(scene.path)) == Data("Second.\n".utf8))
+            #expect(try Data(contentsOf: url.appendingPathComponent(other.path)) == edited)
+            let third = try store.saveTake(try store.createTake(for: scene.id, name: "Third"), text: "Third.\n")
+            try store.checkpoint(scene.id, text: "Moved again.\n")
+            try store.keep(third, choosing: .main)
+            #expect(try Data(contentsOf: url.appendingPathComponent(scene.path)) == Data("Moved again.\n".utf8))
+            #expect(try Data(contentsOf: url.appendingPathComponent(other.path)) == edited)
+        }
+    }
+
     @Test func keepOfATakeWithNothingNewDropsTheRefWithoutAMerge() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)

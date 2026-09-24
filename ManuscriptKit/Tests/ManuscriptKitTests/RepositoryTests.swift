@@ -241,27 +241,6 @@ private func data(_ text: String) -> Data { Data(text.utf8) }
         }
     }
 
-    @Test func checkoutHeadRestoresModifiedAndDeletedFiles() throws {
-        try withTemporaryDirectory { url in
-            let repo = try Repository.create(at: url)
-            let original = data("original\n")
-            try repo.writeWorkingFile(atPath: "a.md", data: original)
-            try repo.writeWorkingFile(atPath: "dir/b.md", data: original)
-            let committed = try repo.writeIndexTree()
-            try repo.createCommit(tree: committed, parents: [], author: jane, message: "1", updatingRef: "refs/heads/main")
-
-            try data("scribbled over\n").write(to: url.appendingPathComponent("a.md"))
-            try FileManager.default.removeItem(at: url.appendingPathComponent("dir/b.md"))
-            try repo.writeWorkingFile(atPath: "a.md", data: data("staged too\n"))
-            #expect(try repo.writeIndexTree() != committed)
-
-            try repo.checkoutHead()
-            #expect(try Data(contentsOf: url.appendingPathComponent("a.md")) == original)
-            #expect(try Data(contentsOf: url.appendingPathComponent("dir/b.md")) == original)
-            #expect(try repo.writeIndexTree() == committed)
-        }
-    }
-
     @Test func mergeFileMergesDifferentLinesAndConflictsOnTheSame() throws {
         try withTemporaryDirectory { url in
             let repo = try Repository.create(at: url)

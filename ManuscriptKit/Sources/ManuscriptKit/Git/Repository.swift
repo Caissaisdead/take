@@ -342,14 +342,6 @@ public final class Repository {
         return ObjectID(oid)
     }
 
-    /// Forces the index and working tree to match HEAD's tree.
-    public func checkoutHead() throws {
-        var options = git_checkout_options()
-        try check(git_checkout_options_init(&options, UInt32(GIT_CHECKOUT_OPTIONS_VERSION)), "git_checkout_options_init")
-        options.checkout_strategy = GIT_CHECKOUT_FORCE.rawValue
-        try check(git_checkout_head(pointer, &options), "git_checkout_head")
-    }
-
     // MARK: - Merge
 
     /// A line-based three-way merge of one file, in memory. Store one paragraph
