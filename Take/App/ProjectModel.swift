@@ -409,6 +409,31 @@ final class ProjectModel {
         }
     }
 
+    /// The draft on main as a Word document.
+    func exportDocx() {
+        guard let store else { return }
+        settle()
+        guard !isDirty else { return }
+        let data: Data
+        do {
+            let head = try store.mainHead()
+            data = try DocxWriter.data(for: try store.manifest()) { try store.sceneText($0, at: head) }
+        } catch {
+            statusLine = "Export failed: \(error)"
+            return
+        }
+        let name = manuscript.title.isEmpty ? "Manuscript" : manuscript.title
+        Task {
+            do {
+                if let url = try await ExportCoordinator.exportDocx(data, suggestedName: name) {
+                    statusLine = "Exported \(url.lastPathComponent)"
+                }
+            } catch {
+                statusLine = "Export failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
     // MARK: - Bench
 
     /// With `-TakeBench` on the command line (or the `TakeBench` default set),

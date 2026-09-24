@@ -56,10 +56,9 @@ final class ProseStyler: NSObject, @MainActor NSTextStorageDelegate {
     /// the whole thing once itself.
     var isSuspended = false
 
-    private let bold = try! NSRegularExpression(pattern: #"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*"#)
-    private let italic = try! NSRegularExpression(pattern: #"(?<!\*)\*(?=[^\s*])([^*\n]+?)(?<=\S)\*(?!\*)"#)
-    // The sample scene marks italics with underscores, as much prose Markdown does.
-    private let underscoreItalic = try! NSRegularExpression(pattern: #"(?<![\w_])_(?=[^\s_])([^_\n]+?)(?<=\S)_(?![\w_])"#)
+    private let bold = MarkdownEmphasis.bold
+    private let italic = MarkdownEmphasis.italic
+    private let underscoreItalic = MarkdownEmphasis.underscoreItalic
 
     func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
         // Attribute-only edits are our own; restyling them again would loop.
@@ -78,8 +77,7 @@ final class ProseStyler: NSObject, @MainActor NSTextStorageDelegate {
 
     private func style(paragraph: NSRange, enclosing: NSRange, in storage: NSTextStorage) {
         let text = storage.mutableString.substring(with: paragraph)
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed == "* * *" || trimmed == "---" {
+        if MarkdownEmphasis.isSceneBreak(text) {
             storage.addAttributes([.paragraphStyle: ProseStyle.centred, .foregroundColor: NSColor.tertiaryLabelColor], range: enclosing)
             return
         }

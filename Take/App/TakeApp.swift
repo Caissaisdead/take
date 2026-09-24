@@ -27,6 +27,8 @@ struct TakeApp: App {
                 Menu("Export") {
                     Button("Markdown Folder…") { model.exportMarkdown() }
                         .keyboardShortcut("e", modifiers: [.command, .shift])
+                    Button("Word Document…") { model.exportDocx() }
+                        .keyboardShortcut("e", modifiers: [.command, .option])
                 }
                 .disabled(model.manuscript.scenes.isEmpty)
             }

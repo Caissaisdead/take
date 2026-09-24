@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import ManuscriptKit
 
 /// Runs the save panels for exports and writes what comes back. The sandbox
@@ -26,5 +27,19 @@ enum ExportCoordinator {
             try file.data.write(to: url, options: .atomic)
         }
         return folder
+    }
+
+    /// Asks where to save a Word document and writes `data` there.
+    static func exportDocx(_ data: Data, suggestedName: String) async throws -> URL? {
+        let panel = NSSavePanel()
+        panel.title = "Export as Word Document"
+        panel.prompt = "Export"
+        panel.nameFieldStringValue = suggestedName + ".docx"
+        panel.allowedContentTypes = [UTType(filenameExtension: "docx") ?? .data]
+        panel.canCreateDirectories = true
+        panel.showsTagField = false
+        guard await panel.begin() == .OK, let url = panel.url else { return nil }
+        try data.write(to: url, options: .atomic)
+        return url
     }
 }
