@@ -318,6 +318,54 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func historyReadAgainMatchesAFreshRead() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "One.\n")
+            let other = try store.addScene(title: "Other", toChapter: nil, text: "Elsewhere.\n")
+            // Read once, so every later read has something to continue from.
+            #expect(try store.history(of: scene.id).count == 1)
+            #expect(try store.history(of: scene.id, limit: 1).count == 1)
+
+            for n in 2...6 {
+                try store.checkpoint(scene.id, text: "One. \(n)\n")
+                try store.checkpoint(other.id, text: "Elsewhere. \(n)\n")
+                try store.rename(scene: other.id, to: "Other \(n)")
+                let fresh = try ProjectStore.open(at: url, author: jane)
+                // The short read first, so the full one after it must not trust it.
+                #expect(try store.history(of: scene.id, limit: 2) == fresh.history(of: scene.id, limit: 2))
+                #expect(try store.history(of: scene.id) == fresh.history(of: scene.id))
+                #expect(try store.history(of: scene.id).count == n)
+                #expect(try store.history(of: other.id) == fresh.history(of: other.id))
+            }
+            // A read cut short by its limit does not shorten a fuller read after it.
+            #expect(try store.history(of: scene.id, limit: 3).count == 3)
+            #expect(try store.history(of: scene.id, limit: 50).count == 6)
+            let take = try store.saveTake(try store.createTake(for: scene.id, name: "Alt"), text: "Alt.\n")
+            guard case .kept = try store.keep(take) else { Issue.record("keep did not merge"); return }
+            let fresh = try ProjectStore.open(at: url, author: jane)
+            #expect(try store.history(of: scene.id) == fresh.history(of: scene.id))
+            #expect(try store.history(of: scene.id).first?.kind == .keep)
+        }
+    }
+
+    @Test func manifestFollowsEveryCommit() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            #expect(try store.manifest().scenes.isEmpty)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "One.\n")
+            #expect(try store.manifest().scenes.map(\.id) == [scene.id])
+            var edited = try store.manifest()
+            edited.title = "Pride and Prejudice"
+            try store.saveManifest(edited, message: "Retitle")
+            #expect(try store.manifest().title == "Pride and Prejudice")
+            // A commit made behind the store's back is seen as well.
+            let fresh = try ProjectStore.open(at: url, author: jane)
+            try fresh.rename(scene: scene.id, to: "A Truth")
+            #expect(try store.manifest().scene(scene.id)?.title == "A Truth")
+        }
+    }
+
     @Test func takesAreCreatedSavedAndReadBack() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)

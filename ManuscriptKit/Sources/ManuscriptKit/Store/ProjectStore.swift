@@ -26,6 +26,14 @@ public final class ProjectStore {
     public static let discardedPrefix = "refs/discarded/"
     public static let milestonesPrefix = "refs/tags/milestones/"
 
+    /// The manifest as decoded from main's head, kept until the head moves.
+    /// Nearly every call reads it, and the app reads it after every save.
+    private var cachedManifest: (head: ObjectID, manuscript: Manuscript)?
+    /// Each scene's history as read from the head it was read at, and whether
+    /// that read ran back to the root. A later read walks only the commits
+    /// since, then goes on with what it had.
+    private var historyCache: [SceneID: (head: ObjectID, versions: [Version], exhausted: Bool)] = [:]
+
     // MARK: - Opening
 
     /// Makes the folder, the repository, the manifest and the first commit.
@@ -51,7 +59,11 @@ public final class ProjectStore {
     // MARK: - Manuscript
 
     public func manifest() throws -> Manuscript {
-        try manifest(at: try mainHead())
+        let head = try mainHead()
+        if let cached = cachedManifest, cached.head == head { return cached.manuscript }
+        let manuscript = try manifest(at: head)
+        cachedManifest = (head, manuscript)
+        return manuscript
     }
 
     @discardableResult
@@ -252,23 +264,40 @@ public final class ProjectStore {
     /// The commits on main that changed this scene, newest first.
     public func history(of scene: SceneID, limit: Int = 50) throws -> [Version] {
         let path = try sceneRef(scene).path
+        let head = try mainHead()
+        let cached = historyCache[scene]
+        if let cached, cached.head == head, cached.exhausted || cached.versions.count >= limit {
+            return Array(cached.versions.prefix(limit))
+        }
         var versions: [Version] = []
+        var exhausted = false
         // First parents only: a take's own commits reach main through the keep
         // merge, but the keep is the version that landed.
-        var commit = try repository.commit(try mainHead())
+        var commit = try repository.commit(head)
         var mine = try repository.entry(atPath: path, inTree: commit.tree)?.id
         while versions.count < limit {
+            // Back at the head last read from: what follows is already known,
+            // unless that read stopped short of what is asked for now.
+            if let cached, commit.id == cached.head, cached.exhausted || versions.count + cached.versions.count >= limit {
+                versions.append(contentsOf: cached.versions)
+                exhausted = cached.exhausted
+                break
+            }
             let parent = try commit.parents.first.map { try repository.commit($0) }
             let theirs = try parent.flatMap { try repository.entry(atPath: path, inTree: $0.tree)?.id }
             if let mine, mine != theirs {
                 let kind: Version.Kind = commit.parents.count == 2 ? .keep : .checkpoint
                 versions.append(Version(id: commit.id, date: commit.author.time, message: commit.message, kind: kind))
             }
-            guard let parent else { break }
+            guard let parent else {
+                exhausted = true
+                break
+            }
             commit = parent
             mine = theirs
         }
-        return versions
+        historyCache[scene] = (head, versions, exhausted)
+        return Array(versions.prefix(limit))
     }
 
     // MARK: - Export
