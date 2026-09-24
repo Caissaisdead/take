@@ -260,6 +260,12 @@ public struct Take: Hashable, Sendable, Identifiable {
     }
 }
 
+/// Which whole scene wins when a keep meets a main that moved.
+public enum KeepSide: Sendable, Equatable {
+    case take
+    case main
+}
+
 public enum KeepResult: Sendable, Equatable {
     /// Main now carries the take's scene. The merge commit is returned, or main's
     /// unchanged head when the take had no commits of its own.

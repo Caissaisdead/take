@@ -226,7 +226,7 @@ private struct NodeView: View {
         switch node.kind {
         case .main: return "Main. Click to open the scene."
         case .take: return "A live take. Click to open it."
-        case .discarded: return "A discarded take; its ref is kept under refs/discarded."
+        case .discarded: return "A discarded take. Click to bring it back."
         }
     }
 }

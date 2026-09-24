@@ -49,12 +49,14 @@ final class ProjectModel {
         static let chapter = Naming.chapter(part: nil)
     }
 
-    /// The three texts a keep could not merge on its own.
+    /// The three texts a keep could not merge on its own, and the take that
+    /// brought them.
     struct Conflict: Identifiable {
         let id = UUID()
+        let take: Take
         let base: String
         let main: String
-        let take: String
+        let text: String
     }
 
     private(set) var manuscript = Manuscript(title: "")
@@ -70,6 +72,7 @@ final class ProjectModel {
     private(set) var editCount = 0
     private(set) var isDirty = false
     private(set) var takes: [Take] = []
+    private(set) var discarded: [Take] = []
     private(set) var history: [Version] = []
     private(set) var milestones: [Milestone] = []
     private(set) var wordCount = 0
@@ -473,7 +476,7 @@ final class ProjectModel {
         case .take(let take):
             select(.take(take))
         case .discarded(let take):
-            statusLine = "\(take.name) was discarded; its ref is \(take.id)"
+            restore(discarded: take)
         }
     }
 
@@ -597,9 +600,37 @@ final class ProjectModel {
                 statusLine = "Kept \(take.name) as \(merge.short)"
                 select(.main(take.scene))
             case .conflict(let base, let main, let mine):
-                conflict = Conflict(base: base, main: main, take: mine)
+                conflict = Conflict(take: take, base: base, main: main, text: mine)
                 statusLine = "Main changed since \(take.name) began; nothing written"
             }
+        }
+    }
+
+    /// Settles a conflicted keep with the whole scene from one side.
+    func settle(_ conflict: Conflict, choosing side: KeepSide) {
+        guard let store else { return }
+        self.conflict = nil
+        attempt("Keep") {
+            let commit = try store.keep(conflict.take, choosing: side)
+            switch side {
+            case .take: statusLine = "Kept \(conflict.take.name) over main as \(commit.short)"
+            case .main: statusLine = "Kept main; \(conflict.take.name) is recorded and gone"
+            }
+            select(.main(conflict.take.scene))
+        }
+    }
+
+    /// Brings a discarded take back to the scene's list and opens it.
+    func restore(discarded take: Take) {
+        guard let store else { return }
+        if isDirty {
+            save()
+            guard !isDirty else { return }
+        }
+        attempt("Restore take") {
+            let restored = try store.restore(discarded: take)
+            statusLine = "Brought back \(restored.name)"
+            select(.take(restored))
         }
     }
 
@@ -674,10 +705,12 @@ final class ProjectModel {
             milestones = try store.milestones()
             guard let scene = selection?.sceneID else {
                 takes = []
+                discarded = []
                 history = []
                 return
             }
             takes = try store.takes(for: scene)
+            discarded = try store.discardedTakes(for: scene)
             history = try store.history(of: scene)
             if case .take(let current)? = selection, let fresh = takes.first(where: { $0.id == current.id }) {
                 selection = .take(fresh)

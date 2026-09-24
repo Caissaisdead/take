@@ -25,6 +25,22 @@ struct VersionsView: View {
                             .selectionDisabled()
                     }
                 }
+                if !model.discarded.isEmpty {
+                    Section("Discarded") {
+                        ForEach(model.discarded) { take in
+                            HStack(spacing: 8) {
+                                Label(take.name, systemImage: "arrow.triangle.branch")
+                                    .foregroundStyle(.secondary)
+                                Spacer(minLength: 4)
+                                Button("Restore") { model.restore(discarded: take) }
+                                    .buttonStyle(.borderless)
+                                    .font(.caption)
+                                    .help("Bring this take back and open it")
+                            }
+                            .selectionDisabled()
+                        }
+                    }
+                }
                 Section("Milestones") {
                     ForEach(model.milestones) { milestone in
                         MilestoneRow(milestone: milestone)

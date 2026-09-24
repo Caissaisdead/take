@@ -457,6 +457,63 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func keepChoosingASideSettlesAConflictWholeScene() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "Base.\n")
+
+            // The take wins: main carries its text, with the take as second parent.
+            let alt = try store.saveTake(try store.createTake(for: scene.id, name: "Alt"), text: "Take.\n")
+            let moved = try #require(try store.checkpoint(scene.id, text: "Main.\n"))
+            #expect(try store.keep(alt) == .conflict(base: "Base.\n", main: "Main.\n", take: "Take.\n"))
+            let kept = try store.keep(alt, choosing: .take)
+            #expect(try store.mainHead() == kept)
+            let info = try store.repository.commit(kept)
+            #expect(info.parents == [moved, alt.head])
+            #expect(info.message == "Keep: Alt - Opening")
+            #expect(try store.sceneText(scene.id) == "Take.\n")
+            #expect(try Data(contentsOf: url.appendingPathComponent(scene.path)) == Data("Take.\n".utf8))
+            #expect(try store.repository.resolve(alt.id) == nil)
+            #expect(try store.history(of: scene.id).map(\.kind) == [.keep, .checkpoint, .checkpoint])
+
+            // Main wins: the text stays, the take is still recorded and gone.
+            let other = try store.saveTake(try store.createTake(for: scene.id, name: "Other"), text: "Other.\n")
+            let later = try #require(try store.checkpoint(scene.id, text: "Main again.\n"))
+            let settled = try store.keep(other, choosing: .main)
+            let record = try store.repository.commit(settled)
+            #expect(record.parents == [later, other.head])
+            #expect(record.message == "Keep main over: Other - Opening")
+            #expect(record.tree == (try store.repository.commit(later).tree))
+            #expect(try store.sceneText(scene.id) == "Main again.\n")
+            #expect(try store.repository.resolve(other.id) == nil)
+            #expect(try store.takes(for: scene.id).isEmpty)
+            #expect(try git("status", "--porcelain", in: url) == "")
+            // The scene's own history skips the record, since its text did not move.
+            #expect(try store.history(of: scene.id).first?.id == later)
+        }
+    }
+
+    @Test func restoreBringsADiscardedTakeBack() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "Base.\n")
+            let take = try store.saveTake(try store.createTake(for: scene.id, name: "Alt"), text: "Alt.\n")
+            try store.discard(take)
+            let discarded = try #require(try store.discardedTakes(for: scene.id).first)
+
+            // Meanwhile the name was reused, so the restored take steps aside.
+            let reused = try store.createTake(for: scene.id, name: "alt")
+            let restored = try store.restore(discarded: discarded)
+            #expect(restored.name == "Alt 2")
+            #expect(restored.id == take.id.replacingOccurrences(of: "/Alt", with: "/Alt%202"))
+            #expect(restored.head == take.head)
+            #expect(restored.base == take.base)
+            #expect(try store.takeText(restored) == "Alt.\n")
+            #expect(try store.discardedTakes(for: scene.id).isEmpty)
+            #expect(Set(try store.takes(for: scene.id).map(\.name)) == [reused.name, "Alt 2"])
+        }
+    }
+
     @Test func discardMovesTheRefAside() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)

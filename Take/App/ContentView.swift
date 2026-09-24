@@ -90,7 +90,7 @@ struct ContentView: View {
         .confirmationDialog("Discard this take?", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("Discard Take", role: .destructive) { model.discard() }
         } message: {
-            Text("Its ref moves under refs/discarded, so it can be brought back by hand. Unsaved edits are dropped.")
+            Text("It moves to the scene's discarded list, where Restore brings it back. Unsaved edits are dropped.")
         }
         .onChange(of: comparing) { _, shown in
             if shown { compareDiff = model.compare() }
@@ -283,25 +283,32 @@ private struct NameSheet: View {
     }
 }
 
+/// A keep that met a moved main: the three texts side by side, and a choice of
+/// whole scene. Paragraph-level picking is not offered; a writer's merge is a
+/// selection.
 private struct ConflictSheet: View {
+    @Environment(ProjectModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let conflict: ProjectModel.Conflict
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Main changed since this take began")
+            Text("Main changed since “\(conflict.take.name)” began")
                 .font(.headline)
-            Text("Nothing was written. The three texts are shown for reading only.")
+            Text("Nothing has been written. Keep one whole scene; the other stays in history either way.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack(alignment: .top, spacing: 12) {
-                column("Base", conflict.base)
-                column("Main", conflict.main)
-                column("Take", conflict.take)
+                column("Where both began", conflict.base)
+                column("Main now", conflict.main)
+                column("The take", conflict.text)
             }
             HStack {
+                Button("Keep Main’s Text") { model.settle(conflict, choosing: .main) }
+                Button("Keep the Take’s Text") { model.settle(conflict, choosing: .take) }
+                    .keyboardShortcut(.defaultAction)
                 Spacer()
-                Button("Close") { dismiss() }
+                Button("Decide Later") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
         }

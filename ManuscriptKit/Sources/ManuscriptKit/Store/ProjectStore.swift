@@ -382,10 +382,48 @@ public final class ProjectStore {
         return .kept(commit)
     }
 
+    /// Settles a keep that met a moved main, whole scene one way or the other.
+    /// Either way main gets a commit with the take as its second parent, so the
+    /// history says the take was weighed, and the take's ref is removed.
+    /// `.take` puts the take's text on main; `.main` leaves main's text as it is.
+    @discardableResult
+    public func keep(_ take: Take, choosing side: KeepSide) throws -> ObjectID {
+        let scene = try sceneRef(take.scene)
+        let head = try mainHead()
+        let mainTree = try repository.commit(head).tree
+        let tree: ObjectID
+        let verb: String
+        switch side {
+        case .take:
+            guard let takeEntry = try entry(scene.path, at: take.head) else { throw ProjectStoreError.missingFile(scene.path) }
+            tree = try repository.tree(replacing: scene.path, with: takeEntry.id, in: mainTree)
+            verb = "Keep"
+        case .main:
+            tree = mainTree
+            verb = "Keep main over"
+        }
+        let commit = try repository.createCommit(tree: tree, parents: [head, take.head], author: stamp(), message: "\(verb): \(take.name) - \(scene.title)", updatingRef: Self.mainRef)
+        try repository.checkoutHead()
+        try repository.deleteRef(take.id)
+        return commit
+    }
+
     /// Moves the take's ref under `refs/discarded/`, so it can be brought back.
     public func discard(_ take: Take) throws {
         let prefix = Self.discardedPrefix + take.scene.uuid.uuidString.lowercased() + "/"
         try repository.renameRef(take.id, to: try freeRef(named: take.name, under: prefix))
+    }
+
+    /// Brings a discarded take back under `refs/takes/`, numbered if its name
+    /// has since been reused. Returns the take as `takes(for:)` will list it.
+    @discardableResult
+    public func restore(discarded take: Take) throws -> Take {
+        let prefix = takesPrefix(for: take.scene)
+        let ref = try freeRef(named: take.name, under: prefix)
+        try repository.renameRef(take.id, to: ref)
+        let head = try mainHead()
+        let base = try repository.mergeBase(head, take.head) ?? take.head
+        return Take(id: ref, scene: take.scene, name: Self.takeName(fromRef: ref, prefix: prefix), base: base, head: take.head)
     }
 
     /// A ref under `prefix` for `name`, numbered past any already there. A take
