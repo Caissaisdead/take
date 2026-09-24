@@ -59,8 +59,9 @@ final class ProjectModel {
 
     private(set) var manuscript = Manuscript(title: "")
     private(set) var selection: Selection?
-    /// The text last loaded into the editor. What the editor holds now is
-    /// `currentText`; nothing on the keystroke path touches this.
+    /// The text last loaded into the editor, kept current by every save so it
+    /// is never staler than main. What the editor holds now is `currentText`;
+    /// nothing on the keystroke path touches this.
     private(set) var editorText = ""
     /// Changes whenever the model sets `editorText`; the editor reloads on this
     /// alone, never by comparing strings.
@@ -193,6 +194,8 @@ final class ProjectModel {
                 self.selection = .take(saved)
                 statusLine = saved.head == take.head ? "Nothing changed on \(take.title)" : "Saved \(take.title) at \(saved.head.short)"
             }
+            // Same token, so the editor keeps its caret; only the fallback moves.
+            editorText = text
             isDirty = false
             refresh()
         }
