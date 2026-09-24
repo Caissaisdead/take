@@ -17,7 +17,7 @@ import Testing
 
     @Test func readsAcrossTheWholeTree() {
         let (m, one, two, a, b, a1, a2, b1) = Self.fixture()
-        #expect(m.format == 2)
+        #expect(m.format == 3)
         #expect(m.chapters.map(\.id) == [a.id, b.id])
         #expect(m.scenes.map(\.id) == [a1.id, a2.id, b1.id])
         #expect(m.part(two.id)?.title == "Two")
@@ -31,10 +31,23 @@ import Testing
     }
 
     @Test func roundTripsThroughJSON() throws {
-        let (m, _, _, _, _, _, _, _) = Self.fixture()
+        var (m, _, _, _, _, a1, _, _) = Self.fixture()
+        try m.set(synopsis: "The letter arrives.", notes: "Too early?", forScene: a1.id)
+        m.target = 90_000
         let data = try JSONEncoder().encode(m)
-        #expect(try JSONDecoder().decode(Manuscript.self, from: data) == m)
-        #expect(String(decoding: data, as: UTF8.self).contains("\"format\":2"))
+        let back = try JSONDecoder().decode(Manuscript.self, from: data)
+        #expect(back == m)
+        #expect(back.scene(a1.id)?.synopsis == "The letter arrives.")
+        #expect(back.scene(a1.id)?.notes == "Too early?")
+        #expect(back.target == 90_000 && back.dailyTarget == nil)
+        #expect(String(decoding: data, as: UTF8.self).contains("\"format\":3"))
+    }
+
+    @Test func aSceneWithoutSynopsisOrNotesDecodes() throws {
+        let json = "{\"id\":{\"uuid\":\"\(UUID().uuidString)\"},\"title\":\"A1\",\"path\":\"chapters/01-a/01-a1.md\"}"
+        let scene = try JSONDecoder().decode(SceneRef.self, from: Data(json.utf8))
+        #expect(scene.title == "A1")
+        #expect(scene.synopsis == "" && scene.notes == "")
     }
 
     @Test func movesCountTheIndexAfterRemoval() throws {

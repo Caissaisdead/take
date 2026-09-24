@@ -157,6 +157,24 @@ public final class ProjectStore {
         try saveManifest(manuscript, message: "Rename chapter \(Self.label(old)) to \(Self.label(title))")
     }
 
+    /// The scene's synopsis and notes, in the manifest and so in history.
+    public func update(scene id: SceneID, synopsis: String, notes: String) throws {
+        var manuscript = try manifest()
+        let scene = try sceneRef(id)
+        guard scene.synopsis != synopsis || scene.notes != notes else { return }
+        try manuscript.set(synopsis: synopsis, notes: notes, forScene: id)
+        try saveManifest(manuscript, message: "Note \(Self.label(scene.title))")
+    }
+
+    /// The draft's word target and the day's, nil to clear either.
+    public func setTargets(_ target: Int?, daily: Int?) throws {
+        var manuscript = try manifest()
+        guard manuscript.target != target || manuscript.dailyTarget != daily else { return }
+        manuscript.target = target
+        manuscript.dailyTarget = daily
+        try saveManifest(manuscript, message: "Set target")
+    }
+
     /// The file keeps its name; only the manifest changes.
     public func rename(scene id: SceneID, to title: String) throws {
         var manuscript = try manifest()
@@ -506,8 +524,12 @@ public final class ProjectStore {
         // instead of failing on whatever key it lacks.
         struct Stamp: Decodable { var format: Int? }
         let format = try JSONDecoder().decode(Stamp.self, from: data).format ?? 1
-        guard format == Manuscript.currentFormat else { throw ProjectStoreError.unsupportedFormat(format) }
-        return try JSONDecoder().decode(Manuscript.self, from: data)
+        guard Manuscript.readableFormats.contains(format) else { throw ProjectStoreError.unsupportedFormat(format) }
+        var manuscript = try JSONDecoder().decode(Manuscript.self, from: data)
+        // An older shape reads with its missing fields empty and is written
+        // back in the current shape by the next commit.
+        manuscript.format = Manuscript.currentFormat
+        return manuscript
     }
 
     private func writeManifest(_ manuscript: Manuscript) throws {

@@ -222,13 +222,59 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
             let manifest = try String(contentsOf: url.appendingPathComponent("manuscript.json"), encoding: .utf8)
-            #expect(manifest.contains("\"format\" : 2"))
+            #expect(manifest.contains("\"format\" : 3"))
 
-            let old = "{\"title\":\"P&P\",\"chapters\":[]}\n"
-            try store.repository.writeWorkingFile(atPath: "manuscript.json", data: Data(old.utf8))
+            func commitManifest(_ json: String) throws {
+                try store.repository.writeWorkingFile(atPath: "manuscript.json", data: Data(json.utf8))
+                let tree = try store.repository.writeIndexTree()
+                try store.repository.createCommit(tree: tree, parents: [try store.mainHead()], author: jane, message: "Manifest", updatingRef: ProjectStore.mainRef)
+            }
+            try commitManifest("{\"title\":\"P&P\",\"chapters\":[]}\n")
+            #expect(throws: ProjectStoreError.unsupportedFormat(1)) { try ProjectStore.open(at: url, author: jane) }
+            try commitManifest("{\"format\":4,\"title\":\"P&P\",\"parts\":[]}\n")
+            #expect(throws: ProjectStoreError.unsupportedFormat(4)) { try ProjectStore.open(at: url, author: jane) }
+        }
+    }
+
+    @Test func aFormatTwoManifestReadsAndIsWrittenBackAsThree() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "One.\n")
+            let chapter = try store.manifest().chapters[0]
+            // The manifest as version 2 wrote it: no synopsis, notes or targets.
+            let two = """
+            {"format":2,"title":"P&P","parts":[{"id":"\(chapter.id.uuidString)","title":"","chapters":[{"id":"\(chapter.id.uuidString)","title":"Chapter 1","folder":"\(chapter.folder)","scenes":[{"id":{"uuid":"\(scene.id.uuid.uuidString)"},"title":"Opening","path":"\(scene.path)"}]}]}]}
+
+            """
+            try store.repository.writeWorkingFile(atPath: "manuscript.json", data: Data(two.utf8))
             let tree = try store.repository.writeIndexTree()
             try store.repository.createCommit(tree: tree, parents: [try store.mainHead()], author: jane, message: "Old", updatingRef: ProjectStore.mainRef)
-            #expect(throws: ProjectStoreError.unsupportedFormat(1)) { try ProjectStore.open(at: url, author: jane) }
+
+            let opened = try ProjectStore.open(at: url, author: jane)
+            let manuscript = try opened.manifest()
+            #expect(manuscript.format == 3)
+            #expect(manuscript.scene(scene.id)?.synopsis == "")
+            #expect(manuscript.scene(scene.id)?.notes == "")
+            #expect(manuscript.target == nil && manuscript.dailyTarget == nil)
+            #expect(try opened.sceneText(scene.id) == "One.\n")
+
+            try opened.update(scene: scene.id, synopsis: "Bennet hears of Bingley.", notes: "Check the date.")
+            let written = try String(contentsOf: url.appendingPathComponent("manuscript.json"), encoding: .utf8)
+            #expect(written.contains("\"format\" : 3"))
+            #expect(written.contains("Bennet hears of Bingley."))
+            #expect(try opened.manifest().scene(scene.id)?.notes == "Check the date.")
+            #expect(try opened.repository.commit(try opened.mainHead()).message == "Note Opening")
+            // The same again writes nothing.
+            let head = try opened.mainHead()
+            try opened.update(scene: scene.id, synopsis: "Bennet hears of Bingley.", notes: "Check the date.")
+            #expect(try opened.mainHead() == head)
+
+            try opened.setTargets(90_000, daily: 1_000)
+            #expect(try opened.manifest().target == 90_000)
+            #expect(try opened.manifest().dailyTarget == 1_000)
+            try opened.setTargets(nil, daily: nil)
+            #expect(try opened.manifest().target == nil)
+            #expect(!(try String(contentsOf: url.appendingPathComponent("manuscript.json"), encoding: .utf8)).contains("target"))
         }
     }
 

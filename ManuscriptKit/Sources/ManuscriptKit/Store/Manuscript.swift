@@ -15,11 +15,28 @@ public struct SceneRef: Codable, Hashable, Sendable, Identifiable {
     /// Path relative to the repository root, e.g. `chapters/01-longbourn/01-a-truth.md`.
     /// Fixed when the scene is added; a rename or a move never changes it.
     public var path: String
+    /// What the scene is for, in the writer's own line. Shown under the title
+    /// and handed to the engines.
+    public var synopsis: String
+    /// The writer's notes on the scene, never part of the draft.
+    public var notes: String
 
-    public init(id: SceneID, title: String, path: String) {
+    public init(id: SceneID, title: String, path: String, synopsis: String = "", notes: String = "") {
         self.id = id
         self.title = title
         self.path = path
+        self.synopsis = synopsis
+        self.notes = notes
+    }
+
+    /// A manifest of format 2 has no synopsis or notes; they read as empty.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(SceneID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        path = try container.decode(String.self, forKey: .path)
+        synopsis = try container.decodeIfPresent(String.self, forKey: .synopsis) ?? ""
+        notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
     }
 }
 
@@ -62,12 +79,19 @@ public struct Part: Codable, Hashable, Sendable, Identifiable {
 public struct Manuscript: Codable, Hashable, Sendable {
     public static let manifestPath = "manuscript.json"
     /// The shape this version of the code writes and reads. Bumped whenever the
-    /// JSON changes in a way an older reader would misread.
-    public static let currentFormat = 2
+    /// JSON changes in a way an older reader would misread. Format 2 lacked the
+    /// scene synopsis and notes and the targets; it is read with those empty
+    /// and written back as 3.
+    public static let currentFormat = 3
+    public static let readableFormats = 2...3
 
     public var format: Int
     public var title: String
     public var parts: [Part]
+    /// Words the whole draft is aiming for, when the writer has said.
+    public var target: Int?
+    /// Words a day, when the writer has said.
+    public var dailyTarget: Int?
 
     public init(title: String, parts: [Part] = []) {
         format = Self.currentFormat
@@ -138,6 +162,12 @@ public struct Manuscript: Codable, Hashable, Sendable {
     public mutating func rename(scene id: SceneID, to title: String) throws {
         let (p, c, s) = try sceneIndex(id)
         parts[p].chapters[c].scenes[s].title = title
+    }
+
+    public mutating func set(synopsis: String, notes: String, forScene id: SceneID) throws {
+        let (p, c, s) = try sceneIndex(id)
+        parts[p].chapters[c].scenes[s].synopsis = synopsis
+        parts[p].chapters[c].scenes[s].notes = notes
     }
 
     /// Takes the scene out of wherever it is and puts it at `index` among the
