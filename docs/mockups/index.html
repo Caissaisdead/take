@@ -30,6 +30,27 @@ h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em;text-wrap:balan
 .stage{display:grid;gap:10px}
 .caption{font-size:13px;color:var(--text-2);margin:0;max-width:70ch}
 [hidden]{display:none!important}
+.accents{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;background:var(--sw);cursor:pointer;padding:0;box-shadow:inset 0 0 0 2px var(--bg)}
+.sw[aria-checked="true"]{border-color:var(--text)}
+.sw:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sw[data-accent="blue"]{--sw:#2F5FD0}.sw[data-accent="indigo"]{--sw:#5B57CC}.sw[data-accent="plum"]{--sw:#99428F}.sw[data-accent="rust"]{--sw:#C25733}.sw[data-accent="moss"]{--sw:#3D8757}.sw[data-accent="graphite"]{--sw:#6B707A}
+:root[data-accent="indigo"]{--accent:#5B57CC;--accent-tint:rgba(91,87,204,.10);--sel:#DEDDF6}
+:root[data-accent="plum"]{--accent:#99428F;--accent-tint:rgba(153,66,143,.10);--sel:#EED9EB}
+:root[data-accent="rust"]{--accent:#C25733;--accent-tint:rgba(194,87,51,.10);--sel:#F5DDD3}
+:root[data-accent="moss"]{--accent:#3D8757;--accent-tint:rgba(61,135,87,.10);--sel:#D8ECDF}
+:root[data-accent="graphite"]{--accent:#6B707A;--accent-tint:rgba(107,112,122,.12);--sel:#DFE2E7}
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"])[data-accent="indigo"]{--accent:#8E8BEB;--sel:#34336A}
+:root:not([data-theme="light"])[data-accent="plum"]{--accent:#CC7BC2;--sel:#4E2A49}
+:root:not([data-theme="light"])[data-accent="rust"]{--accent:#E78A67;--sel:#5A3324}
+:root:not([data-theme="light"])[data-accent="moss"]{--accent:#7CC492;--sel:#25452F}
+:root:not([data-theme="light"])[data-accent="graphite"]{--accent:#A6ABB5;--sel:#3A3D45}}
+:root[data-theme="dark"][data-accent="indigo"]{--accent:#8E8BEB;--sel:#34336A}
+:root[data-theme="dark"][data-accent="plum"]{--accent:#CC7BC2;--sel:#4E2A49}
+:root[data-theme="dark"][data-accent="rust"]{--accent:#E78A67;--sel:#5A3324}
+:root[data-theme="dark"][data-accent="moss"]{--accent:#7CC492;--sel:#25452F}
+:root[data-theme="dark"][data-accent="graphite"]{--accent:#A6ABB5;--sel:#3A3D45}
 
 /* device frames scale to the column */
 .frame{position:relative;width:100%;overflow:hidden}
@@ -199,6 +220,16 @@ h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em;text-wrap:balan
       <button role="tab" aria-selected="false" data-screen="ph-since">Since</button>
       <button role="tab" aria-selected="false" data-screen="ph-pull">Pull</button>
     </div>
+  </div>
+  <div class="accents" role="radiogroup" aria-label="Accent">
+    <span class="note">Accent</span>
+    <button class="sw" data-accent="blue" aria-checked="true" role="radio" title="Blue"></button>
+    <button class="sw" data-accent="indigo" aria-checked="false" role="radio" title="Indigo"></button>
+    <button class="sw" data-accent="plum" aria-checked="false" role="radio" title="Plum"></button>
+    <button class="sw" data-accent="rust" aria-checked="false" role="radio" title="Rust"></button>
+    <button class="sw" data-accent="moss" aria-checked="false" role="radio" title="Moss"></button>
+    <button class="sw" data-accent="graphite" aria-checked="false" role="radio" title="Graphite"></button>
+    <span class="note" id="accent-name">Blue · controls, selections and live takes</span>
   </div>
 
   <!-- ================= MAC ================= -->
@@ -631,6 +662,16 @@ h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em;text-wrap:balan
     });
   }
   window.addEventListener('resize',fit);
+  var accentNames={blue:'Blue',indigo:'Indigo',plum:'Plum',rust:'Rust',moss:'Moss',graphite:'Graphite'};
+  function accent(a){
+    if(a==='blue')document.documentElement.removeAttribute('data-accent');else document.documentElement.setAttribute('data-accent',a);
+    document.querySelectorAll('.sw').forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.accent===a));});
+    document.getElementById('accent-name').textContent=accentNames[a]+' · controls, selections and live takes';
+    try{localStorage.setItem('take-screens-accent',a);}catch(_){}
+  }
+  document.querySelectorAll('.sw').forEach(function(b){b.addEventListener('click',function(){accent(b.dataset.accent);});});
+  var a0='blue'; try{a0=localStorage.getItem('take-screens-accent')||'blue';}catch(_){}
+  accent(accentNames[a0]?a0:'blue');
   var start='mac'; try{start=localStorage.getItem('take-screens-device')||'mac';}catch(_){}
   if(location.hash==='#phone')start='phone';
   device(start); fit();

@@ -65,10 +65,25 @@ Take (a paragraph), Back Up, Pull. A thing is never "synced", "deleted" or
 
 ### Colour
 
-The platform's. The accent is the system accent; the only fixed colours
-are the diff's red (removed) and green (added), the orange unsaved dot, and
-the map's tint on live takes (the accent at 8% for the fill). Dark mode is
-the system's, with no colour of the app's own that needs a second version.
+The platform's, with one choice of the writer's: the **accent**, which is
+the colour of controls, selections, links in Compare, and live takes on
+the map (the accent at 8% for the fill). Six to pick from in Settings, on
+both apps, kept on the device and never in a project:
+
+| | Light | Dark |
+|---|---|---|
+| Blue (default) | `#2F5FD0` | `#6E93F0` |
+| Indigo | `#5B57CC` | `#8E8BEB` |
+| Plum | `#99428F` | `#CC7BC2` |
+| Rust | `#C25733` | `#E78A67` |
+| Moss | `#3D8757` | `#7CC492` |
+| Graphite | `#6B707A` | `#A6ABB5` |
+
+Each is picked to read on white and on near-black at the same weight, so
+a selection, a link and a tinted take look the same choice in either
+appearance. The only other fixed colours are the diff's red (removed) and
+green (added) and the orange unsaved dot; those never follow the accent,
+so a removed word is red under every choice.
 
 ### Words in the status line
 

@@ -98,6 +98,8 @@ struct ChangesView: View {
 }
 
 private struct ChangeRow: View {
+    @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
+    private var accent: Color { (Accent(rawValue: accentName) ?? .blue).color }
     let change: SceneChange
     let scale: Int
 
@@ -133,7 +135,7 @@ private struct ChangeRow: View {
         switch change.kind {
         case .added: return .green
         case .removed: return .red
-        case .changed: return .accentColor
+        case .changed: return accent
         case .same: return .secondary
         }
     }
