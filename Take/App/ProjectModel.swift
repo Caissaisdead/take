@@ -68,6 +68,8 @@ final class ProjectModel {
     /// Changes whenever the model sets `editorText`; the editor reloads on this
     /// alone, never by comparing strings.
     private(set) var loadToken = 0
+    /// What the editor selects once it has loaded `editorText`; nil is the top.
+    private(set) var editorSelection: NSRange?
     /// Counts user edits since launch, for anything that wants to follow typing.
     private(set) var editCount = 0
     private(set) var isDirty = false
@@ -100,6 +102,8 @@ final class ProjectModel {
     @ObservationIgnored private var bench: Task<Void, Never>?
     /// Reads the editor's text on demand, once the editor exists.
     @ObservationIgnored private var readEditor: (() -> String?)?
+    /// Selects a range in the editor as it is, without a reload.
+    @ObservationIgnored private var showInEditor: ((NSRange) -> Void)?
     @ObservationIgnored private let log = Logger(subsystem: "com.siddharthnigam.take", category: "editor")
 
     static let idleSaveDelay: Duration = .seconds(10)
@@ -277,6 +281,7 @@ final class ProjectModel {
     /// after a removal it would be the removed scene's.
     func editorGone(text: String) {
         readEditor = nil
+        showInEditor = nil
         if isDirty { editorText = text }
     }
 
@@ -314,7 +319,9 @@ final class ProjectModel {
 
     // MARK: - Editing
 
-    func select(_ target: Selection) {
+    /// Opens main or a take in the editor. `selecting` names a paragraph and
+    /// a range within it, in the stored text's terms, to select once loaded.
+    func select(_ target: Selection, selecting: (paragraph: Int, location: Int, length: Int)? = nil) {
         if isDirty {
             save()
             // A failed save keeps the edits on screen rather than dropping them.
@@ -335,8 +342,34 @@ final class ProjectModel {
             }
             selection = target
             compareBase = .automatic
-            setEditorText(Prose.editorForm(text), dirty: false)
+            let editor = Prose.editorForm(text)
+            let range = selecting.flatMap { Prose.editorRange(paragraph: $0.paragraph, location: $0.location, length: $0.length, in: editor) }
+            setEditorText(editor, dirty: false, selecting: range.map { NSRange(location: $0.location, length: $0.length) })
             refresh()
+        }
+    }
+
+    /// Opens what a search hit is in and selects the hit. When it is in the
+    /// text already on screen, the editor is left as it is and only the
+    /// selection moves, so unsaved work stays unsaved.
+    func reveal(_ match: Match) {
+        let target: Selection = match.take.map { Selection.take($0) } ?? Selection.main(match.scene)
+        if selection == target {
+            guard let range = Prose.editorRange(paragraph: match.paragraph, location: match.location, length: match.length, in: currentText) else { return }
+            showInEditor?(NSRange(location: range.location, length: range.length))
+        } else {
+            select(target, selecting: (match.paragraph, match.location, match.length))
+        }
+    }
+
+    /// Every hit of `query` in the draft, in manuscript order.
+    func search(_ query: String, includingTakes: Bool) -> [Match] {
+        guard let store else { return [] }
+        do {
+            return try store.search(query, includingTakes: includingTakes)
+        } catch {
+            statusLine = "Find failed: \(error.localizedDescription)"
+            return []
         }
     }
 
@@ -844,6 +877,10 @@ final class ProjectModel {
     /// project and quits, so a harness needs nothing from the UI.
     func editorReady(_ textView: ProseTextView) {
         readEditor = { [weak textView] in textView?.string }
+        showInEditor = { [weak textView] range in
+            textView?.show(range)
+            textView?.window?.makeFirstResponder(textView)
+        }
         guard Self.isBenchRequested, bench == nil else { return }
         bench = Task { await runBench(on: textView) }
     }
@@ -1023,10 +1060,11 @@ final class ProjectModel {
         }
     }
 
-    private func setEditorText(_ text: String, dirty: Bool) {
+    private func setEditorText(_ text: String, dirty: Bool, selecting: NSRange? = nil) {
         idleSave?.cancel()
         recount?.cancel()
         editorText = text
+        editorSelection = selecting
         loadToken += 1
         isDirty = dirty
         wordCount = Prose.wordCount(text)
