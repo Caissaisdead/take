@@ -69,14 +69,17 @@ struct Untangler {
     /// Below this the model has nothing to read and makes a scene up.
     static let minimumWords = 40
 
-    func untangle(scene title: String, text: String) async throws -> Untangling {
+    func untangle(scene title: String, synopsis: String = "", text: String) async throws -> Untangling {
         if let reason = unavailableReason { throw EngineError.notReady(reason) }
         guard Prose.wordCount(text) >= Self.minimumWords else {
             throw EngineError.notReady("The scene has too little text to untangle. Write a few paragraphs first.")
         }
         let (body, note) = Self.fit(text, within: contextWindow - Self.reserved)
         let session = LanguageModelSession(instructions: Self.instructions)
-        let prompt = "Scene title: \(title)\n\n\(body)"
+        let line = synopsis.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = line.isEmpty
+            ? "Scene title: \(title)\n\n\(body)"
+            : "Scene title: \(title)\nThe writer says it is for: \(line)\n\n\(body)"
         do {
             let response = try await session.respond(
                 to: prompt,

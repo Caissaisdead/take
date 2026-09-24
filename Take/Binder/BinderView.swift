@@ -167,7 +167,19 @@ private struct SceneRow: View {
     @Binding var removing: ProjectModel.BinderItem?
 
     var body: some View {
-        Label(scene.title, systemImage: "doc.text")
+        Label {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(scene.title)
+                if !scene.synopsis.isEmpty {
+                    Text(scene.synopsis)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        } icon: {
+            Image(systemName: "doc.text")
+        }
             .contextMenu {
                 Button("Rename Scene…") { model.naming = .rename(.scene(scene.id)) }
                 Button("New Scene After…") { model.naming = .scene(chapter: nil, after: scene.id) }
