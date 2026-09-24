@@ -3,6 +3,10 @@ import Foundation
 /// The rules for prose as it is stored: Markdown, one paragraph per line, a blank
 /// line between paragraphs, no hard wrapping. Every diff, prompt and export reads
 /// this form, so the rules live in one place.
+///
+/// The editor shows the same prose with no blank lines at all, one paragraph
+/// per line, so that a return is always a new paragraph; `editorForm` and
+/// `paragraphsByLine` convert at that boundary.
 public enum Prose {
     /// The paragraphs of a text: split on blank lines, line endings normalised,
     /// trailing whitespace trimmed, empty paragraphs dropped. A paragraph never
@@ -36,6 +40,22 @@ public enum Prose {
     /// `join(paragraphs(text))`.
     public static func normalize(_ text: String) -> String {
         join(paragraphs(text))
+    }
+
+    /// Stored prose as the editor shows it: the paragraphs on consecutive
+    /// lines, no blank lines, no trailing newline.
+    public static func editorForm(_ text: String) -> String {
+        paragraphs(text).joined(separator: "\n")
+    }
+
+    /// The paragraphs of editor text, where every line break ends a paragraph:
+    /// trailing whitespace trimmed, blank lines dropped. `join` of these is the
+    /// stored form.
+    public static func paragraphsByLine(_ text: String) -> [String] {
+        text.split(omittingEmptySubsequences: false, whereSeparator: isLineBreak)
+            .map(trimmingTrailingWhitespace)
+            .filter { !$0.isEmpty }
+            .map(String.init)
     }
 
     /// The number of whitespace-separated runs in the whole text, as a writer

@@ -228,9 +228,16 @@ final class ProjectModel {
         return url
     }
 
-    /// The loaded text plus whatever has been typed since.
+    /// The loaded text plus whatever has been typed since, as the editor holds
+    /// it: one paragraph per line.
     var currentText: String {
         readEditor?() ?? editorText
+    }
+
+    /// `currentText` in stored form, which is what the store, the differ and
+    /// the engines all read.
+    private var storedText: String {
+        Prose.join(Prose.paragraphsByLine(currentText))
     }
 
     /// The editor's last text, handed over as its view goes away (the window
@@ -282,7 +289,7 @@ final class ProjectModel {
             }
             selection = target
             compareBase = .automatic
-            setEditorText(text, dirty: false)
+            setEditorText(Prose.editorForm(text), dirty: false)
             refresh()
         }
     }
@@ -297,7 +304,7 @@ final class ProjectModel {
     func save() {
         idleSave?.cancel()
         guard let store, let selection else { return }
-        let text = Prose.normalize(currentText)
+        let text = storedText
         attempt("Save") {
             switch selection {
             case .main(let id):
@@ -312,7 +319,7 @@ final class ProjectModel {
                 statusLine = saved.head == take.head ? "Nothing changed on \(take.name)" : "Saved \(take.name) at \(saved.head.short)"
             }
             // Same token, so the editor keeps its caret; only the fallback moves.
-            editorText = text
+            editorText = Prose.editorForm(text)
             isDirty = false
             refresh()
         }
@@ -331,7 +338,7 @@ final class ProjectModel {
         guard let store, let scene = selection?.sceneID else { return }
         attempt("Restore") {
             let text = try store.sceneText(scene, at: commit)
-            setEditorText(text, dirty: true)
+            setEditorText(Prose.editorForm(text), dirty: true)
             statusLine = "Restored \(label) into the editor, unsaved"
         }
     }
@@ -351,7 +358,7 @@ final class ProjectModel {
 
     /// The stress text as an unsaved edit.
     func loadStress() {
-        setEditorText(Self.stressText, dirty: true)
+        setEditorText(Prose.editorForm(Self.stressText), dirty: true)
         statusLine = "Stress text loaded, \(wordCount) words, unsaved"
     }
 
@@ -609,7 +616,7 @@ final class ProjectModel {
     func untangle() {
         guard selection != nil, !isUntangling else { return }
         let title = sceneTitle
-        let text = currentText
+        let text = storedText
         isUntangling = true
         untangleError = nil
         untangleTask?.cancel()
@@ -923,7 +930,7 @@ final class ProjectModel {
                 commit = milestones.first { $0.id == ref }?.commit
             }
             guard let commit else { return nil }
-            return ProseDiffer.diff(old: try store.sceneText(scene, at: commit), new: currentText)
+            return ProseDiffer.diff(old: try store.sceneText(scene, at: commit), new: storedText)
         } catch {
             statusLine = "Compare failed: \(error)"
             return nil

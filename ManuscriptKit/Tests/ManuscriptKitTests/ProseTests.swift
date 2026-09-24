@@ -56,6 +56,32 @@ import Testing
         #expect(Prose.normalize("\n\n  \n") == "")
     }
 
+    @Test func editorFormHasNoBlankLines() {
+        #expect(Prose.editorForm("One.\n\nTwo.\n\n\n\nThree.\n") == "One.\nTwo.\nThree.")
+        #expect(Prose.editorForm("wrapped\nline\n\nnext") == "wrapped line\nnext")
+        #expect(Prose.editorForm("") == "")
+        #expect(Prose.editorForm("\n\n") == "")
+    }
+
+    @Test func everyLineBreakInTheEditorEndsAParagraph() {
+        #expect(Prose.paragraphsByLine("One.\nTwo.") == ["One.", "Two."])
+        #expect(Prose.paragraphsByLine("One.\r\nTwo.\rThree.") == ["One.", "Two.", "Three."])
+        #expect(Prose.paragraphsByLine("One.  \n\n   \nTwo.\t\n") == ["One.", "Two."])
+        #expect(Prose.paragraphsByLine("    Indented.") == ["    Indented."])
+        #expect(Prose.paragraphsByLine("") == [])
+        #expect(Prose.paragraphsByLine("\n \n") == [])
+        #expect(Prose.join(Prose.paragraphsByLine("One.\nTwo.")) == "One.\n\nTwo.\n")
+    }
+
+    @Test func editorFormRoundTripsTheSample() throws {
+        let sample = try ProseDiffTests.sample()
+        let editor = Prose.editorForm(sample)
+        #expect(!editor.contains("\n\n"))
+        #expect(!editor.hasSuffix("\n"))
+        #expect(Prose.join(Prose.paragraphsByLine(editor)) == sample)
+        #expect(Prose.wordCount(editor) == Prose.wordCount(sample))
+    }
+
     @Test func wordCount() {
         #expect(Prose.wordCount("") == 0)
         #expect(Prose.wordCount("   \n\t") == 0)

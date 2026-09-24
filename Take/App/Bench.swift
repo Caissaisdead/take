@@ -62,12 +62,13 @@ struct Bench {
 
     let textView: ProseTextView
 
-    /// Loads straight into the view: the editor only reloads on its owner's load
-    /// token, so nothing pushes the old text back while the bench runs.
+    /// Loads straight into the view, in the form the editor shows: the editor
+    /// only reloads on its owner's load token, so nothing pushes the old text
+    /// back while the bench runs.
     func run(_ texts: [(label: String, text: String)]) -> Result {
         var samples: [Sample] = []
         for (label, text) in texts {
-            let loadMillis = textView.setText(text)
+            let loadMillis = textView.setText(Prose.editorForm(text))
             let whole = textView.string as NSString
             let middle = whole.paragraphRange(for: NSRange(location: whole.length / 2, length: 0)).location
             let middleStats = type(at: middle)
