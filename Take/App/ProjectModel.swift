@@ -76,6 +76,19 @@ final class ProjectModel {
     var statusLine = ""
     var conflict: Conflict?
     var naming: Naming?
+    /// What the compare pane holds the editor against. Reset when the scene changes.
+    var compareBase: CompareBase = .automatic
+
+    /// One side of a comparison; the other is always the editor.
+    enum CompareBase: Hashable, Identifiable {
+        /// Main for a take; the previous version for main.
+        case automatic
+        case main
+        case version(ObjectID)
+        case milestone(String)
+
+        var id: Self { self }
+    }
 
     @ObservationIgnored private var store: ProjectStore?
     @ObservationIgnored private var idleSave: Task<Void, Never>?
@@ -150,6 +163,7 @@ final class ProjectModel {
             case .take(let take): text = try store.takeText(take)
             }
             selection = target
+            compareBase = .automatic
             setEditorText(text, dirty: false)
             refresh()
         }
@@ -455,22 +469,52 @@ final class ProjectModel {
 
     // MARK: - Compare
 
-    /// In a take, the editor against main's copy of the scene. On main, the
-    /// editor against the version before the current one, when there is one.
+    /// The bases the compare pane can offer for the open scene: main for a take,
+    /// every version in the scene's history and every milestone.
+    var compareChoices: [(base: CompareBase, label: String)] {
+        guard selection != nil else { return [] }
+        var choices: [(CompareBase, String)] = [(.automatic, isInTake ? "Main" : "Previous version")]
+        if isInTake { choices.append((.main, "Main now")) }
+        for milestone in milestones {
+            choices.append((.milestone(milestone.id), "Milestone: \(milestone.name)"))
+        }
+        for version in history {
+            choices.append((.version(version.id), "\(version.message) · \(Self.short(version.date))"))
+        }
+        return choices.map { (base: $0.0, label: $0.1) }
+    }
+
+    /// The editor against the chosen base. Automatic is main's copy for a take,
+    /// and the version before the current one for main, when there is one.
     func compare() -> ProseDiff? {
         guard let store, let selection else { return nil }
+        let scene = selection.sceneID
         do {
-            switch selection {
-            case .take(let take):
-                return ProseDiffer.diff(old: try store.sceneText(take.scene), new: currentText)
-            case .main(let id):
-                guard history.count > 1 else { return nil }
-                return ProseDiffer.diff(old: try store.sceneText(id, at: history[1].id), new: currentText)
+            let commit: ObjectID?
+            switch compareBase {
+            case .automatic:
+                if case .take = selection {
+                    commit = try store.mainHead()
+                } else {
+                    commit = history.count > 1 ? history[1].id : nil
+                }
+            case .main:
+                commit = try store.mainHead()
+            case .version(let id):
+                commit = id
+            case .milestone(let ref):
+                commit = milestones.first { $0.id == ref }?.commit
             }
+            guard let commit else { return nil }
+            return ProseDiffer.diff(old: try store.sceneText(scene, at: commit), new: currentText)
         } catch {
             statusLine = "Compare failed: \(error)"
             return nil
         }
+    }
+
+    private static func short(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
     }
 
     // MARK: - Plumbing

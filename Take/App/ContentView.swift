@@ -33,6 +33,14 @@ struct ContentView: View {
                 case .versions:
                     VersionsView()
                 case .compare:
+                    Picker("Against", selection: $model.compareBase) {
+                        ForEach(model.compareChoices, id: \.base) { choice in
+                            Text(choice.label).tag(choice.base)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .disabled(model.selection == nil)
                     CompareView(diff: compareDiff)
                         .equatable()
                 }
@@ -58,6 +66,8 @@ struct ContentView: View {
                     .help("Load the sample scene four times over, about 20k words, as an unsaved edit")
                 Toggle("Compare", isOn: compareBinding)
                     .toggleStyle(.button)
+                    .keyboardShortcut("d", modifiers: [.command, .shift])
+                    .help("Compare the editor with another version (⇧⌘D)")
                 Toggle("Inspector", systemImage: "sidebar.right", isOn: $showInspector)
                     .toggleStyle(.button)
             }
@@ -77,6 +87,9 @@ struct ContentView: View {
             if shown { compareDiff = model.compare() }
         }
         .onChange(of: model.selection) {
+            if comparing { compareDiff = model.compare() }
+        }
+        .onChange(of: model.compareBase) {
             if comparing { compareDiff = model.compare() }
         }
         .onChange(of: model.editCount) {

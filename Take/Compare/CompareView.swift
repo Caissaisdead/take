@@ -23,7 +23,7 @@ struct CompareView: View, Equatable {
                 ContentUnavailableView(
                     "Nothing to compare",
                     systemImage: "doc.on.doc",
-                    description: Text("A take compares with main. Main compares with its previous version, once it has one.")
+                    description: Text("Pick a version or milestone above. Main compares with its previous version once it has one.")
                 )
             }
         }
