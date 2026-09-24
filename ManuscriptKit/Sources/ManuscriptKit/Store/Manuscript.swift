@@ -113,9 +113,11 @@ public struct Manuscript: Codable, Hashable, Sendable {
         parts[p].chapters.append(chapter)
     }
 
-    public mutating func append(_ scene: SceneRef, toChapter chapter: UUID) throws {
+    /// At `index` among the chapter's scenes, or at the end.
+    public mutating func insert(_ scene: SceneRef, inChapter chapter: UUID, at index: Int? = nil) throws {
         let (p, c) = try chapterIndex(chapter)
-        parts[p].chapters[c].scenes.append(scene)
+        let count = parts[p].chapters[c].scenes.count
+        parts[p].chapters[c].scenes.insert(scene, at: min(index ?? count, count))
     }
 
     public mutating func rename(part id: UUID, to title: String) throws {

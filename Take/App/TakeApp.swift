@@ -11,12 +11,20 @@ struct TakeApp: App {
         }
         .defaultSize(width: 1100, height: 760)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Scene…") { model.naming = .scene }
+                    .keyboardShortcut("n", modifiers: .command)
+                Button("New Chapter…") { model.naming = .chapter }
+                    .keyboardShortcut("n", modifiers: [.command, .option])
+                Button("New Part…") { model.naming = .part }
+                    .keyboardShortcut("n", modifiers: [.command, .option, .shift])
+            }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { model.save() }
                     .keyboardShortcut("s", modifiers: .command)
             }
             CommandMenu("Take") {
-                Button("New Take…") { model.isNamingTake = true }
+                Button("New Take…") { model.naming = .take }
                     .keyboardShortcut("t", modifiers: [.command, .shift])
                     .disabled(model.selection == nil)
                 Divider()

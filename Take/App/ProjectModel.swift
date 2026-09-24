@@ -23,6 +23,31 @@ final class ProjectModel {
         }
     }
 
+    /// A row in the binder.
+    enum BinderItem: Hashable {
+        case part(UUID)
+        case chapter(UUID)
+        case scene(SceneID)
+    }
+
+    /// What the name sheet is asking a name for.
+    enum Naming: Identifiable, Hashable {
+        case take
+        /// A scene after `after` in its chapter, or at the end of `chapter`, or
+        /// after the open scene when both are nil.
+        case scene(chapter: UUID?, after: SceneID?)
+        /// A chapter at the end of `part`, or of the open scene's part.
+        case chapter(part: UUID?)
+        case part
+        case rename(BinderItem)
+
+        var id: Self { self }
+
+        /// From the toolbar or the menu: relative to whatever is open.
+        static let scene = Naming.scene(chapter: nil, after: nil)
+        static let chapter = Naming.chapter(part: nil)
+    }
+
     /// The three texts a keep could not merge on its own.
     struct Conflict: Identifiable {
         let id = UUID()
@@ -48,7 +73,7 @@ final class ProjectModel {
     private(set) var lastLoadMillis: Double?
     var statusLine = ""
     var conflict: Conflict?
-    var isNamingTake = false
+    var naming: Naming?
 
     @ObservationIgnored private var store: ProjectStore?
     @ObservationIgnored private var idleSave: Task<Void, Never>?
@@ -175,6 +200,148 @@ final class ProjectModel {
     func recordLoad(millis: Double) {
         lastLoadMillis = millis
         log.info("editor load \(millis, format: .fixed(precision: 1)) ms for \(self.wordCount) words")
+    }
+
+    // MARK: - Shape
+
+    /// Where a new scene goes: the selected scene's chapter, else the last one.
+    var currentChapter: UUID? {
+        selection.flatMap { manuscript.chapter(containing: $0.sceneID)?.id } ?? manuscript.chapters.last?.id
+    }
+
+    /// Where a new chapter goes: the current chapter's part, else the last one.
+    var currentPart: UUID? {
+        currentChapter.flatMap { manuscript.part(containing: $0)?.id } ?? manuscript.parts.last?.id
+    }
+
+    func title(of item: BinderItem) -> String {
+        switch item {
+        case .part(let id): return manuscript.part(id)?.title ?? ""
+        case .chapter(let id): return manuscript.chapter(id)?.title ?? ""
+        case .scene(let id): return manuscript.scene(id)?.title ?? ""
+        }
+    }
+
+    /// Adds and opens an empty scene: after `after`, else at the end of
+    /// `chapter`, else after the open scene.
+    func addScene(named title: String, inChapter chapter: UUID?, after: SceneID?) {
+        guard let store else { return }
+        settle()
+        guard !isDirty else { return }
+        let anchor = after ?? (chapter == nil ? selection?.sceneID : nil)
+        let destination = anchor.flatMap { manuscript.chapter(containing: $0) } ?? chapter.flatMap { manuscript.chapter($0) }
+        let index = anchor.flatMap { id in destination?.scenes.firstIndex { $0.id == id }.map { $0 + 1 } }
+        attempt("New scene") {
+            let scene = try store.addScene(title: title, toChapter: destination?.id ?? currentChapter, at: index, text: "")
+            refresh()
+            select(.main(scene.id))
+            statusLine = "Added \(title)"
+        }
+    }
+
+    /// Adds a chapter at the end of `part`, else of the open scene's part.
+    func addChapter(named title: String, inPart part: UUID?) {
+        guard let store else { return }
+        attempt("New chapter") {
+            _ = try store.addChapter(title: title, toPart: part ?? currentPart)
+            refresh()
+            statusLine = "Added chapter \(title)"
+        }
+    }
+
+    func addPart(named title: String) {
+        guard let store else { return }
+        attempt("New part") {
+            _ = try store.addPart(title: title)
+            refresh()
+            statusLine = "Added part \(title)"
+        }
+    }
+
+    func rename(_ item: BinderItem, to title: String) {
+        guard let store else { return }
+        attempt("Rename") {
+            switch item {
+            case .part(let id): try store.rename(part: id, to: title)
+            case .chapter(let id): try store.rename(chapter: id, to: title)
+            case .scene(let id): try store.rename(scene: id, to: title)
+            }
+            refresh()
+            statusLine = "Renamed to \(title)"
+        }
+    }
+
+    /// `index` counts among the chapter's scenes after the scene is taken out.
+    func move(scene id: SceneID, toChapter chapter: UUID, at index: Int) {
+        guard let store else { return }
+        attempt("Move") {
+            try store.move(scene: id, toChapter: chapter, at: index)
+            refresh()
+        }
+    }
+
+    /// One step up (-1) or down (+1) among its part's chapters.
+    func move(chapter id: UUID, by offset: Int) {
+        guard let store, let part = manuscript.part(containing: id),
+              let index = part.chapters.firstIndex(where: { $0.id == id }) else { return }
+        let target = index + offset
+        guard part.chapters.indices.contains(target) else { return }
+        attempt("Move") {
+            try store.move(chapter: id, toPart: part.id, at: target)
+            refresh()
+        }
+    }
+
+    /// To the end of another part.
+    func move(chapter id: UUID, toPart part: UUID) {
+        guard let store else { return }
+        attempt("Move") {
+            try store.move(chapter: id, toPart: part, at: .max)
+            refresh()
+        }
+    }
+
+    func move(part id: UUID, by offset: Int) {
+        guard let store, let index = manuscript.parts.firstIndex(where: { $0.id == id }) else { return }
+        let target = index + offset
+        guard manuscript.parts.indices.contains(target) else { return }
+        attempt("Move") {
+            try store.move(part: id, to: target)
+            refresh()
+        }
+    }
+
+    /// Removes the item and whatever it holds. A removed scene that was open
+    /// leaves the editor empty; its edits go with it.
+    func remove(_ item: BinderItem) {
+        guard let store else { return }
+        let title = title(of: item)
+        let gone: Set<SceneID>
+        switch item {
+        case .part(let id): gone = Set(manuscript.part(id)?.chapters.flatMap(\.scenes).map(\.id) ?? [])
+        case .chapter(let id): gone = Set(manuscript.chapter(id)?.scenes.map(\.id) ?? [])
+        case .scene(let id): gone = [id]
+        }
+        if let current = selection?.sceneID, gone.contains(current) {
+            idleSave?.cancel()
+            isDirty = false
+            selection = nil
+            setEditorText("", dirty: false)
+        }
+        attempt("Remove") {
+            switch item {
+            case .part(let id): try store.remove(part: id)
+            case .chapter(let id): try store.remove(chapter: id)
+            case .scene(let id): try store.remove(scene: id)
+            }
+            refresh()
+            statusLine = "Removed \(title); it stays in history"
+        }
+    }
+
+    /// Saves whatever is dirty so a shape change never sits on unsaved text.
+    private func settle() {
+        if isDirty { save() }
     }
 
     // MARK: - Bench

@@ -61,6 +61,17 @@ import Testing
         #expect(m.parts.map(\.id) == [one.id, two.id])
     }
 
+    @Test func insertsAtAnIndexOrAtTheEnd() throws {
+        var (m, _, _, a, _, a1, a2, _) = Self.fixture()
+        let x = SceneRef(id: SceneID(), title: "X", path: "chapters/01-a/03-x.md")
+        let y = SceneRef(id: SceneID(), title: "Y", path: "chapters/01-a/04-y.md")
+        let z = SceneRef(id: SceneID(), title: "Z", path: "chapters/01-a/05-z.md")
+        try m.insert(x, inChapter: a.id, at: 1)
+        try m.insert(y, inChapter: a.id)
+        try m.insert(z, inChapter: a.id, at: 99)
+        #expect(m.chapter(a.id)?.scenes.map(\.id) == [a1.id, x.id, a2.id, y.id, z.id])
+    }
+
     @Test func renamesAndRemovals() throws {
         var (m, one, _, a, b, a1, a2, b1) = Self.fixture()
         try m.rename(part: one.id, to: "Volume One")
@@ -96,7 +107,7 @@ import Testing
         #expect(throws: ProjectStoreError.unknownScene(ghostScene)) { try m.remove(scene: ghostScene) }
         #expect(throws: ProjectStoreError.unknownChapter(ghost)) { try m.remove(chapter: ghost) }
         #expect(throws: ProjectStoreError.unknownPart(ghost)) { try m.remove(part: ghost) }
-        #expect(throws: ProjectStoreError.unknownChapter(ghost)) { try m.append(SceneRef(id: SceneID(), title: "X", path: "x.md"), toChapter: ghost) }
+        #expect(throws: ProjectStoreError.unknownChapter(ghost)) { try m.insert(SceneRef(id: SceneID(), title: "X", path: "x.md"), inChapter: ghost) }
         #expect(throws: ProjectStoreError.unknownPart(ghost)) { try m.append(Chapter(title: "X", folder: "chapters/09-x"), toPart: ghost) }
         #expect(m == before)
     }

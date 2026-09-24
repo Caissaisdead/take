@@ -87,6 +87,10 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             let inSecond = try store.addScene(title: "The Ball", toChapter: netherfield.id, text: "Dancing.\n")
             #expect(inSecond.path == "chapters/02-netherfield/01-the-ball.md")
             #expect(try store.addScene(title: "After", toChapter: nil, text: "Late.\n").path == "chapters/02-netherfield/02-after.md")
+            // Numbered by count, placed by index.
+            let between = try store.addScene(title: "Between", toChapter: netherfield.id, at: 1, text: "Mid.\n")
+            #expect(between.path == "chapters/02-netherfield/03-between.md")
+            #expect(try store.manifest().chapter(netherfield.id)?.scenes.map(\.title) == ["The Ball", "Between", "After"])
 
             #expect(throws: ProjectStoreError.unknownChapter(UUID(uuidString: "00000000-0000-0000-0000-000000000000")!)) {
                 try store.addScene(title: "Lost", toChapter: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!, text: "")

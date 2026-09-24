@@ -82,9 +82,10 @@ public final class ProjectStore {
         return chapter
     }
 
-    /// Adds a scene at the end of `chapter` (or of the last chapter, or of a
-    /// first chapter made for it), writes its file and commits.
-    public func addScene(title: String, toChapter chapter: UUID?, text: String) throws -> SceneRef {
+    /// Adds a scene to `chapter` (or to the last chapter, or to a first chapter
+    /// made for it) at `index` among its scenes or at the end, writes its file
+    /// and commits.
+    public func addScene(title: String, toChapter chapter: UUID?, at index: Int? = nil, text: String) throws -> SceneRef {
         var manuscript = try manifest()
         let head = try mainHead()
         let destination: UUID
@@ -100,7 +101,7 @@ public final class ProjectStore {
         }
         let path = try scenePath(for: title, in: manuscript.chapter(destination)!, of: manuscript, at: head)
         let scene = SceneRef(id: SceneID(), title: title, path: path)
-        try manuscript.append(scene, toChapter: destination)
+        try manuscript.insert(scene, inChapter: destination, at: index)
 
         try repository.writeWorkingFile(atPath: path, data: stored(text))
         try writeManifest(manuscript)
