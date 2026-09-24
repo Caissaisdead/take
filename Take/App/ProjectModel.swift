@@ -382,6 +382,33 @@ final class ProjectModel {
         if isDirty { save() }
     }
 
+    // MARK: - Export
+
+    /// The draft on main as Markdown, after saving whatever is unsaved so the
+    /// export matches the screen.
+    func exportMarkdown() {
+        guard let store else { return }
+        settle()
+        guard !isDirty else { return }
+        let files: [ExportFile]
+        do {
+            files = try store.exportMarkdown()
+        } catch {
+            statusLine = "Export failed: \(error)"
+            return
+        }
+        let name = manuscript.title.isEmpty ? "Manuscript" : manuscript.title
+        Task {
+            do {
+                if let folder = try await ExportCoordinator.exportMarkdown(files, suggestedName: name) {
+                    statusLine = "Exported \(files.count) files to \(folder.lastPathComponent)"
+                }
+            } catch {
+                statusLine = "Export failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
     // MARK: - Bench
 
     /// With `-TakeBench` on the command line (or the `TakeBench` default set),

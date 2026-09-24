@@ -23,6 +23,13 @@ struct TakeApp: App {
                 Button("Save") { model.save() }
                     .keyboardShortcut("s", modifiers: .command)
             }
+            CommandGroup(replacing: .importExport) {
+                Menu("Export") {
+                    Button("Markdown Folder…") { model.exportMarkdown() }
+                        .keyboardShortcut("e", modifiers: [.command, .shift])
+                }
+                .disabled(model.manuscript.scenes.isEmpty)
+            }
             CommandMenu("Draft") {
                 Button("Mark Milestone…") { model.naming = .milestone }
                     .keyboardShortcut("m", modifiers: .command)

@@ -271,6 +271,15 @@ public final class ProjectStore {
         return versions
     }
 
+    // MARK: - Export
+
+    /// The draft on main as Markdown files, combined draft first.
+    public func exportMarkdown() throws -> [ExportFile] {
+        let manuscript = try manifest()
+        let head = try mainHead()
+        return try MarkdownExport.files(for: manuscript) { try sceneText($0, at: head) }
+    }
+
     // MARK: - Takes
 
     /// Branches the scene from main's head under `refs/takes/<scene>/<slug>`. The
