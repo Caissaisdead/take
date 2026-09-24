@@ -41,6 +41,37 @@ public struct ProseDiff: Sendable, Equatable {
         segments.contains { if case .equal = $0 { return false } else { return true } }
     }
 
+    /// The new text's paragraphs with the segment at `index` settled the old
+    /// way: a changed paragraph goes back to the old text, a removed one comes
+    /// back, an inserted one goes. Every other segment stays as the new text
+    /// has it, so picking is one paragraph at a time.
+    public func takingOld(at index: Int) -> [String] {
+        var paragraphs: [String] = []
+        for (i, segment) in segments.enumerated() {
+            switch segment {
+            case .equal(let text):
+                paragraphs.append(text)
+            case .inserted(let text):
+                if i != index { paragraphs.append(text) }
+            case .removed(let text):
+                if i == index { paragraphs.append(text) }
+            case .changed(let old, let new, _):
+                paragraphs.append(i == index ? old : new)
+            }
+        }
+        return paragraphs
+    }
+
+    /// Where the paragraph settled by `takingOld(at:)` sits among the
+    /// paragraphs it returns, for selecting it; for a dropped paragraph, the
+    /// one that follows.
+    public func paragraphIndexTakingOld(at index: Int) -> Int {
+        segments.prefix(index).reduce(0) { count, segment in
+            if case .removed = segment { return count }
+            return count + 1
+        }
+    }
+
     /// Paragraphs inserted, removed or changed, and the words added and removed
     /// across all of them. A changed paragraph contributes only the words that
     /// differ; a whole paragraph contributes every one of its words. Counted as

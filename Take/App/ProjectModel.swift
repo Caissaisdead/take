@@ -1067,6 +1067,19 @@ final class ProjectModel {
         }
     }
 
+    /// Takes the compared side of one paragraph into the editor: a changed
+    /// paragraph goes back to how the base has it, a removed one comes back,
+    /// an added one goes. Unsaved, like any edit; the idle save follows.
+    func pick(segment index: Int) {
+        guard let diff = compare(), diff.segments.indices.contains(index) else { return }
+        let paragraphs = diff.takingOld(at: index)
+        let editor = Prose.editorForm(Prose.join(paragraphs))
+        let position = min(diff.paragraphIndexTakingOld(at: index), max(paragraphs.count - 1, 0))
+        let range = paragraphs.isEmpty ? nil : Prose.editorRange(paragraph: position, location: 0, length: paragraphs[position].utf16.count, in: editor)
+        setEditorText(editor, dirty: true, selecting: range.map { NSRange(location: $0.location, length: $0.length) })
+        statusLine = "Took the paragraph from the other side; unsaved"
+    }
+
     private static func short(_ date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
     }

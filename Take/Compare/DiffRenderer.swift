@@ -7,6 +7,14 @@ import ManuscriptKit
 /// so a struck word does not drag its line across the gap.
 @MainActor
 enum DiffRenderer {
+    /// Links at the end of a changed paragraph name the segment they act on.
+    nonisolated static let pickScheme = "take-pick"
+
+    nonisolated static func segment(in link: URL) -> Int? {
+        guard link.scheme == pickScheme else { return nil }
+        return Int(link.lastPathComponent)
+    }
+
     static func render(_ diff: ProseDiff) -> NSAttributedString {
         let out = NSMutableAttributedString()
         for (index, segment) in diff.segments.enumerated() {
@@ -16,8 +24,10 @@ enum DiffRenderer {
                 out.append(run(paragraph, color: .secondaryLabelColor))
             case .removed(let paragraph):
                 out.append(run(paragraph, color: .systemRed, decoration: .strikethroughStyle))
+                out.append(pick("bring back", segment: index))
             case .inserted(let paragraph):
                 out.append(run(paragraph, color: .systemGreen, decoration: .underlineStyle))
+                out.append(pick("drop", segment: index))
             case .changed(_, _, let words):
                 for word in words {
                     switch word {
@@ -29,9 +39,21 @@ enum DiffRenderer {
                         out.append(run(token, color: .systemGreen, decoration: .underlineStyle))
                     }
                 }
+                out.append(pick("take theirs", segment: index))
             }
         }
         return out
+    }
+
+    /// A small link after a paragraph: what taking the other side would do.
+    private static func pick(_ verb: String, segment: Int) -> NSAttributedString {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.linkColor,
+            .link: URL(string: "\(pickScheme)://segment/\(segment)")!,
+            .paragraphStyle: paragraphStyle,
+        ]
+        return NSAttributedString(string: "  ⟵ \(verb)", attributes: attributes)
     }
 
     private static let paragraphStyle: NSParagraphStyle = {

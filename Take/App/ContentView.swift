@@ -76,7 +76,7 @@ struct ContentView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .disabled(model.selection == nil)
-                    CompareView(diff: compareDiff)
+                    CompareView(diff: compareDiff, onPick: { model.pick(segment: $0) })
                         .equatable()
                 case .untangle:
                     UntangleView()
@@ -153,6 +153,10 @@ struct ContentView: View {
             if comparing { compareDiff = model.compare() }
         }
         .onChange(of: model.compareBase) {
+            if comparing { compareDiff = model.compare() }
+        }
+        .onChange(of: model.loadToken) {
+            // A pick, a restore or a reload changes the text without a keystroke.
             if comparing { compareDiff = model.compare() }
         }
         .onChange(of: model.editCount) {

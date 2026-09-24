@@ -111,6 +111,32 @@ import Testing
         #expect(diff.segments.map(Kind.init) == [.changed, .changed, .removed])
     }
 
+    @Test func takingTheOldSideSettlesOneParagraphAtATime() {
+        let old = "One.\n\nThe quick brown fox jumps.\n\nGone from new.\n\nLast.\n"
+        let new = "One.\n\nThe quick red fox jumps.\n\nAdded in new.\n\nLast.\n"
+        let diff = ProseDiffer.diff(old: old, new: new)
+        #expect(diff.segments.map(Kind.init) == [.equal, .changed, .removed, .inserted, .equal])
+
+        #expect(diff.takingOld(at: 1) == ["One.", "The quick brown fox jumps.", "Added in new.", "Last."])
+        #expect(diff.takingOld(at: 2) == ["One.", "The quick red fox jumps.", "Gone from new.", "Added in new.", "Last."])
+        #expect(diff.takingOld(at: 3) == ["One.", "The quick red fox jumps.", "Last."])
+        #expect(diff.takingOld(at: 0) == Prose.paragraphs(new))
+        #expect(diff.takingOld(at: 99) == Prose.paragraphs(new))
+
+        #expect(diff.paragraphIndexTakingOld(at: 1) == 1)
+        #expect(diff.paragraphIndexTakingOld(at: 2) == 2)
+        #expect(diff.paragraphIndexTakingOld(at: 3) == 2)
+        #expect(diff.paragraphIndexTakingOld(at: 4) == 3)
+
+        // Taking every old side in turn, newest first, gets back to old.
+        var text = new
+        for index in diff.segments.indices.reversed() {
+            let step = ProseDiffer.diff(old: old, new: text)
+            if index < step.segments.count { text = Prose.join(step.takingOld(at: index)) }
+        }
+        #expect(text == old)
+    }
+
     @Test func emptyOld() {
         let diff = ProseDiffer.diff(old: "", new: "One.\n\nTwo two.\n")
         #expect(diff.segments == [.inserted("One."), .inserted("Two two.")])
