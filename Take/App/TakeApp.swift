@@ -39,6 +39,10 @@ struct TakeApp: App {
                 .disabled(model.manuscript.scenes.isEmpty)
             }
             CommandMenu("Draft") {
+                Button("Find in Draft…") { NotificationCenter.default.post(name: .showFind, object: nil) }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+                    .disabled(model.manuscript.scenes.isEmpty)
+                Divider()
                 Button("Untangle This Scene") { NotificationCenter.default.post(name: .showUntangle, object: nil) }
                     .keyboardShortcut("u", modifiers: .command)
                     .disabled(model.selection == nil)

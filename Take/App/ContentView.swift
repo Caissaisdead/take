@@ -3,13 +3,14 @@ import ManuscriptKit
 
 struct ContentView: View {
     enum InspectorTab: Hashable, CaseIterable {
-        case versions, compare, scene, untangle
+        case versions, compare, scene, find, untangle
 
         var name: String {
             switch self {
             case .versions: return "Versions"
             case .compare: return "Compare"
             case .scene: return "Scene"
+            case .find: return "Find"
             case .untangle: return "Untangle"
             }
         }
@@ -19,6 +20,7 @@ struct ContentView: View {
             case .versions: return "clock"
             case .compare: return "doc.on.doc"
             case .scene: return "note.text"
+            case .find: return "magnifyingglass"
             case .untangle: return "wand.and.sparkles"
             }
         }
@@ -63,6 +65,8 @@ struct ContentView: View {
                     VersionsView()
                 case .scene:
                     SceneView()
+                case .find:
+                    FindView()
                 case .compare:
                     Picker("Against", selection: $model.compareBase) {
                         ForEach(model.compareChoices, id: \.base) { choice in
@@ -135,6 +139,10 @@ struct ContentView: View {
             showInspector = true
             model.untangle()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showFind)) { _ in
+            inspectorTab = .find
+            showInspector = true
+        }
         .onChange(of: comparing) { _, shown in
             if shown { compareDiff = model.compare() }
         }
@@ -192,6 +200,7 @@ private struct DetailView: View {
                 EditorView(
                     text: model.editorText,
                     loadToken: model.loadToken,
+                    selection: model.editorSelection,
                     onChange: { model.textChanged() },
                     onLoad: { model.recordLoad(millis: $0) },
                     onReady: { model.editorReady($0) },
@@ -472,4 +481,6 @@ private struct ConflictSheet: View {
 extension Notification.Name {
     /// Draft > Untangle: open the pane and run it.
     static let showUntangle = Notification.Name("TakeShowUntangle")
+    /// Draft > Find: open the pane and put the caret in the field.
+    static let showFind = Notification.Name("TakeShowFind")
 }

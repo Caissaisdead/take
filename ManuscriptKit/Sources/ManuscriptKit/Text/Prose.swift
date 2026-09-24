@@ -74,6 +74,25 @@ public enum Prose {
         return count
     }
 
+    /// Where the `paragraph`th paragraph's `location..<location+length` (UTF-16
+    /// units within the paragraph) falls in editor text: the offset of that
+    /// paragraph's line plus the location. Blank lines in the editor are not
+    /// paragraphs and are skipped over; nil when the editor has fewer
+    /// paragraphs than that.
+    public static func editorRange(paragraph: Int, location: Int, length: Int, in editorText: String) -> (location: Int, length: Int)? {
+        var offset = 0
+        var seen = 0
+        for line in editorText.split(omittingEmptySubsequences: false, whereSeparator: isLineBreak) {
+            let blank = trimmingTrailingWhitespace(line).isEmpty
+            if !blank {
+                if seen == paragraph { return (offset + location, length) }
+                seen += 1
+            }
+            offset += line.utf16.count + 1
+        }
+        return nil
+    }
+
     /// The first `words` words, in whole paragraphs, in stored form. Always at
     /// least the first paragraph, however long.
     public static func head(_ text: String, words: Int) -> String {

@@ -155,9 +155,10 @@ final class ProseTextView: NSTextView {
 
     /// Replaces the whole document, restyles it once and reports the time taken,
     /// in milliseconds. Layout is not forced: TextKit 2 lays out the viewport
-    /// lazily, and that laziness is part of what the spike measures.
+    /// lazily, and that laziness is part of what the spike measures. The caret
+    /// lands at the top, or on `selecting` when a range is asked for.
     @discardableResult
-    func setText(_ text: String) -> Double {
+    func setText(_ text: String, selecting: NSRange? = nil) -> Double {
         guard let storage = textStorage else { return 0 }
         let elapsed = ContinuousClock().measure {
             isSettingText = true
@@ -171,17 +172,29 @@ final class ProseTextView: NSTextView {
             styler.restyle(storage, in: NSRange(location: 0, length: storage.length))
             storage.endEditing()
             undoManager?.removeAllActions()
-            setSelectedRange(NSRange(location: 0, length: 0))
         }
-        scrollToBeginningOfDocument(nil)
+        show(selecting)
         // The first viewport layout works from estimated heights and can leave the
-        // scroll position mid-document; settle at the top again once it has run.
+        // scroll position mid-document; settle again once it has run.
         DispatchQueue.main.async { [weak self] in
-            self?.setSelectedRange(NSRange(location: 0, length: 0))
-            self?.scrollToBeginningOfDocument(nil)
+            self?.show(selecting)
         }
         onLoad(elapsed.milliseconds)
         return elapsed.milliseconds
+    }
+
+    /// Selects `range` and scrolls to it, or goes to the top for nil. A range
+    /// past the end of the text is clipped to it.
+    func show(_ range: NSRange?) {
+        let length = (string as NSString).length
+        guard let range, range.location <= length else {
+            setSelectedRange(NSRange(location: 0, length: 0))
+            scrollToBeginningOfDocument(nil)
+            return
+        }
+        let clipped = NSRange(location: range.location, length: min(range.length, length - range.location))
+        setSelectedRange(clipped)
+        scrollRangeToVisible(clipped)
     }
 
     override func didChangeText() {

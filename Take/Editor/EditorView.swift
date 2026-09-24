@@ -9,6 +9,8 @@ import SwiftUI
 struct EditorView: NSViewRepresentable {
     var text: String
     var loadToken: Int
+    /// Selected once the text is loaded; nil puts the caret at the top.
+    var selection: NSRange? = nil
     var onChange: () -> Void = {}
     var onLoad: (_ millis: Double) -> Void = { _ in }
     /// Receives the text view once it exists, for the in-app bench.
@@ -40,7 +42,7 @@ struct EditorView: NSViewRepresentable {
         coordinator.textView = textView
         coordinator.loadedToken = loadToken
         scrollView.documentView = textView
-        textView.setText(text)
+        textView.setText(text, selecting: selection)
         DispatchQueue.main.async { coordinator.parent.onReady(textView) }
         return scrollView
     }
@@ -50,7 +52,7 @@ struct EditorView: NSViewRepresentable {
         coordinator.parent = self
         guard let textView = coordinator.textView, coordinator.loadedToken != loadToken else { return }
         coordinator.loadedToken = loadToken
-        textView.setText(text)
+        textView.setText(text, selecting: selection)
     }
 
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
