@@ -80,6 +80,14 @@ import Testing
         ])
     }
 
+    @Test func notesNeverLeaveWithTheDraft() throws {
+        let scene = SceneRef(id: SceneID(), title: "Noted", path: "chapters/01-a/01-noted.md")
+        let m = Manuscript(title: "P&P", parts: [Part(title: "", chapters: [Chapter(title: "One", folder: "chapters/01-a", scenes: [scene])])])
+        let text = "It is a truth [[is it?]] acknowledged.\n\n[[cut this scene?]]\n"
+        #expect(try MarkdownExport.combined(m) { _ in text } == "# P&P\n\n## One\n\nIt is a truth acknowledged.\n")
+        #expect(try MarkdownExport.files(for: m) { _ in text }[1].text == "It is a truth acknowledged.\n")
+    }
+
     @Test func fileNamesNeverHideOrEscapeTheFolder() {
         #expect(MarkdownExport.fileName("../etc", fallback: "x") == "-etc")
         #expect(MarkdownExport.fileName("...", fallback: "x") == "x")
