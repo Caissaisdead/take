@@ -234,10 +234,16 @@ final class ProjectModel {
         }
     }
 
+    /// The last project's folder, when it still holds a repository. The sandbox
+    /// answers nothing about a folder outside the container until its grant is
+    /// taken up, so the check runs inside one; `open` takes its own, and
+    /// `remember` renews a bookmark that has gone stale.
     private static func lastProjectURL() -> URL? {
         guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
         var stale = false
         guard let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }
+        let granted = url.startAccessingSecurityScopedResource()
+        defer { if granted { url.stopAccessingSecurityScopedResource() } }
         guard FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) else { return nil }
         return url
     }
