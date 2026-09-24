@@ -355,11 +355,22 @@ final class ProjectModel {
     func reveal(_ match: Match) {
         let target: Selection = match.take.map { Selection.take($0) } ?? Selection.main(match.scene)
         if selection == target {
-            guard let range = Prose.editorRange(paragraph: match.paragraph, location: match.location, length: match.length, in: currentText) else { return }
-            showInEditor?(NSRange(location: range.location, length: range.length))
+            showInText(paragraph: match.paragraph, location: match.location, length: match.length)
         } else {
             select(target, selecting: (match.paragraph, match.location, match.length))
         }
+    }
+
+    /// The writer's `[[notes]]` in the text on screen, in order.
+    var notesInText: [Prose.Note] {
+        Prose.notes(in: storedText)
+    }
+
+    /// Selects a note, or any range given in the stored text's terms, in the
+    /// text on screen.
+    func showInText(paragraph: Int, location: Int, length: Int) {
+        guard let range = Prose.editorRange(paragraph: paragraph, location: location, length: length, in: currentText) else { return }
+        showInEditor?(NSRange(location: range.location, length: range.length))
     }
 
     /// Every hit of `query` in the draft, in manuscript order.
@@ -643,7 +654,7 @@ final class ProjectModel {
         for scene in chapter.scenes {
             do {
                 let mainText = try store.sceneText(scene.id)
-                let main = MapNode(id: "main:\(scene.id.uuid.uuidString)", kind: .main, title: scene.title, words: Prose.wordCount(mainText), delta: nil, saves: 0, synopsis: scene.synopsis)
+                let main = MapNode(id: "main:\(scene.id.uuid.uuidString)", kind: .main, title: scene.title, words: Prose.wordCount(Prose.withoutNotes(mainText)), delta: nil, saves: 0, synopsis: scene.synopsis)
                 var takes: [MapNode] = []
                 for take in try store.takes(for: scene.id) {
                     takes.append(try node(for: take, against: mainText, discarded: false))
@@ -668,7 +679,7 @@ final class ProjectModel {
             id: take.id,
             kind: discarded ? .discarded(take) : .take(take),
             title: take.name,
-            words: Prose.wordCount(text),
+            words: Prose.wordCount(Prose.withoutNotes(text)),
             delta: (summary.wordsAdded, summary.wordsRemoved),
             saves: saves)
     }
@@ -1067,7 +1078,7 @@ final class ProjectModel {
         editorSelection = selecting
         loadToken += 1
         isDirty = dirty
-        wordCount = Prose.wordCount(text)
+        wordCount = Prose.wordCount(Prose.withoutNotes(text))
         if dirty { scheduleIdleSave() }
     }
 
@@ -1088,7 +1099,7 @@ final class ProjectModel {
         recount = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled, let self else { return }
-            self.wordCount = Prose.wordCount(self.currentText)
+            self.wordCount = Prose.wordCount(Prose.withoutNotes(self.currentText))
         }
     }
 

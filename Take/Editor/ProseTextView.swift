@@ -60,6 +60,7 @@ final class ProseStyler: NSObject, @MainActor NSTextStorageDelegate {
     private let bold = MarkdownEmphasis.bold
     private let italic = MarkdownEmphasis.italic
     private let underscoreItalic = MarkdownEmphasis.underscoreItalic
+    private let note = Prose.notePattern
 
     func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
         // Attribute-only edits are our own; restyling them again would loop.
@@ -85,6 +86,11 @@ final class ProseStyler: NSObject, @MainActor NSTextStorageDelegate {
         apply(bold, font: ProseStyle.bold, to: text, offset: paragraph.location, in: storage)
         apply(italic, font: ProseStyle.italic, to: text, offset: paragraph.location, in: storage)
         apply(underscoreItalic, font: ProseStyle.italic, to: text, offset: paragraph.location, in: storage)
+        // A writer's note, brackets and all, steps back from the prose.
+        let whole = NSRange(location: 0, length: (text as NSString).length)
+        for match in note.matches(in: text, range: whole) {
+            storage.addAttributes([.font: ProseStyle.italic, .foregroundColor: NSColor.tertiaryLabelColor], range: shifted(match.range, by: paragraph.location))
+        }
     }
 
     private func apply(_ pattern: NSRegularExpression, font: NSFont, to text: String, offset: Int, in storage: NSTextStorage) {

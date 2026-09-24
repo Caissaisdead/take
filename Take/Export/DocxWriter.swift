@@ -31,7 +31,7 @@ enum DocxWriter {
                 out.append(heading(title.isEmpty ? "Chapter \(chapterNumber)" : title, size: 14, centred: false, spaceBefore: 30))
                 var first = true
                 for scene in chapter.scenes {
-                    let paragraphs = Prose.paragraphs(try text(scene.id))
+                    let paragraphs = Prose.paragraphs(Prose.withoutNotes(try text(scene.id)))
                     guard !paragraphs.isEmpty else { continue }
                     if !first { out.append(sceneBreak()) }
                     first = false

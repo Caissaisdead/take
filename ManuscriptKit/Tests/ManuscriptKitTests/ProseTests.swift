@@ -122,6 +122,22 @@ import Testing
         #expect(empty.kept.isEmpty && empty.total == 0 && empty.whole)
     }
 
+    @Test func notesAreFoundAndTakenOut() {
+        let text = "She left [[check the date]] at once.\n\n[[ whole paragraph is a note ]]\n\nHe stayed [[why?]] behind[[and then?]].\n"
+        let notes = Prose.notes(in: text)
+        #expect(notes.map(\.text) == ["check the date", "whole paragraph is a note", "why?", "and then?"])
+        #expect(notes.map(\.paragraph) == [0, 1, 2, 2])
+        #expect(notes[0].location == 9 && notes[0].length == 18)
+        #expect(notes[3].location == 25)
+        #expect(Prose.withoutNotes(text) == "She left at once.\n\nHe stayed behind.\n")
+        #expect(Prose.withoutNotes("No notes here.\n") == "No notes here.\n")
+        #expect(Prose.withoutNotes("[[only]]") == "")
+        // A lone bracket, or an open note, is prose.
+        #expect(Prose.notes(in: "[[not closed\n\n[x]\n").isEmpty)
+        #expect(Prose.withoutNotes("[[not closed\n") == "[[not closed\n")
+        #expect(Prose.wordCount(Prose.withoutNotes(text)) == 7)
+    }
+
     @Test func wordCount() {
         #expect(Prose.wordCount("") == 0)
         #expect(Prose.wordCount("   \n\t") == 0)

@@ -10,6 +10,8 @@ struct SceneView: View {
     @State private var notes = ""
     @State private var loadedFor: SceneID?
     @State private var pending: Task<Void, Never>?
+    @State private var inText: [Prose.Note] = []
+    @State private var scan: Task<Void, Never>?
 
     var body: some View {
         if let scene = model.currentScene {
@@ -30,12 +32,32 @@ struct SceneView: View {
                     Text("Both go to Untangle and Three Takes with the scene, and never into the draft.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    heading("In the text")
+                    if inText.isEmpty {
+                        Text("Write [[a note]] in the prose and it is listed here, dimmed on the page and left out of every export.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(inText) { note in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("¶\(note.paragraph + 1)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.tertiary)
+                                .frame(width: 28, alignment: .trailing)
+                            Text(note.text.isEmpty ? "(empty)" : note.text)
+                                .font(.callout)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.showInText(paragraph: note.paragraph, location: note.location, length: note.length) }
+                    }
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .onAppear { load(scene) }
-            .onChange(of: scene.id) { load(scene) }
+            .onAppear { load(scene); inText = model.notesInText }
+            .onChange(of: scene.id) { load(scene); inText = model.notesInText }
+            .onChange(of: model.loadToken) { inText = model.notesInText }
+            .onChange(of: model.editCount) { rescan() }
             .onChange(of: synopsis) { schedule() }
             .onChange(of: notes) { schedule() }
             .onDisappear { pending?.cancel(); save() }
@@ -56,6 +78,17 @@ struct SceneView: View {
         loadedFor = scene.id
         synopsis = scene.synopsis
         notes = scene.notes
+    }
+
+    /// Half a second after the last keystroke, not on each: the scan reads the
+    /// whole text.
+    private func rescan() {
+        scan?.cancel()
+        scan = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            inText = model.notesInText
+        }
     }
 
     private func schedule() {

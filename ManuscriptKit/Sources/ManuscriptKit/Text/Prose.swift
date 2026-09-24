@@ -74,6 +74,53 @@ public enum Prose {
         return count
     }
 
+    /// A writer's note in the prose, `[[like this]]`: shown dimmed, listed in
+    /// the Scene pane, and never part of the draft that leaves the app.
+    public struct Note: Hashable, Sendable, Identifiable {
+        public var paragraph: Int
+        /// The whole `[[…]]` within the paragraph, in UTF-16 units.
+        public var location: Int
+        public var length: Int
+        /// What is between the brackets, trimmed.
+        public var text: String
+
+        public var id: String { "\(paragraph):\(location)" }
+    }
+
+    public static let notePattern = try! NSRegularExpression(pattern: #"\[\[([^\[\]\n]*)\]\]"#)
+
+    /// Every note in the text, in order.
+    public static func notes(in text: String) -> [Note] {
+        var notes: [Note] = []
+        for (index, paragraph) in paragraphs(text).enumerated() {
+            let whole = NSRange(location: 0, length: (paragraph as NSString).length)
+            for match in notePattern.matches(in: paragraph, range: whole) {
+                let inner = (paragraph as NSString).substring(with: match.range(at: 1))
+                notes.append(Note(paragraph: index, location: match.range.location, length: match.range.length, text: inner.trimmingCharacters(in: .whitespaces)))
+            }
+        }
+        return notes
+    }
+
+    /// The text with every note taken out, in stored form: the space a note
+    /// left is closed up, and a paragraph that was only a note goes.
+    public static func withoutNotes(_ text: String) -> String {
+        var kept: [String] = []
+        for paragraph in paragraphs(text) {
+            let whole = NSRange(location: 0, length: (paragraph as NSString).length)
+            guard notePattern.firstMatch(in: paragraph, range: whole) != nil else {
+                kept.append(paragraph)
+                continue
+            }
+            var cleaned = notePattern.stringByReplacingMatches(in: paragraph, range: whole, withTemplate: "")
+            cleaned = cleaned.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+            cleaned = cleaned.replacingOccurrences(of: #" ([,.;:!?])"#, with: "$1", options: .regularExpression)
+            cleaned = cleaned.trimmingCharacters(in: .whitespaces)
+            if !cleaned.isEmpty { kept.append(cleaned) }
+        }
+        return join(kept)
+    }
+
     /// Where the `paragraph`th paragraph's `location..<location+length` (UTF-16
     /// units within the paragraph) falls in editor text: the offset of that
     /// paragraph's line plus the location. Blank lines in the editor are not

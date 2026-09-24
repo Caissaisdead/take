@@ -30,7 +30,7 @@ public enum MarkdownExport {
                 let folder = partFolder + "\(number(chapterNumber)) \(fileName(chapter.title, fallback: "Chapter \(chapterNumber)"))"
                 for (s, scene) in chapter.scenes.enumerated() {
                     let name = "\(number(s + 1)) \(fileName(scene.title, fallback: "Scene \(s + 1)")).md"
-                    files.append(ExportFile(path: "\(folder)/\(name)", data: Data(Prose.normalize(try text(scene.id)).utf8)))
+                    files.append(ExportFile(path: "\(folder)/\(name)", data: Data(Prose.withoutNotes(try text(scene.id)).utf8)))
                 }
             }
         }
@@ -54,7 +54,7 @@ public enum MarkdownExport {
                 out += "\n\(chapterMark) \(heading(chapter.title, fallback: "Chapter \(chapterNumber)"))\n"
                 var first = true
                 for scene in chapter.scenes {
-                    let body = Prose.normalize(try text(scene.id))
+                    let body = Prose.withoutNotes(try text(scene.id))
                     guard !body.isEmpty else { continue }
                     out += first ? "\n" : "\n* * *\n\n"
                     out += body
