@@ -365,7 +365,7 @@ public final class ProjectStore {
         return takes
     }
 
-    /// Takes discarded from this scene, under `refs/discarded/`, oldest first.
+    /// Takes discarded from this scene, under `refs/discarded/`, by name.
     /// Their base is the merge base with main today, as for live takes.
     public func discardedTakes(for scene: SceneID) throws -> [Take] {
         let head = try mainHead()
@@ -562,7 +562,7 @@ public final class ProjectStore {
     /// many chapters the manuscript has had before it. Chapters are numbered
     /// across parts, so the folder never says which part it is in.
     private func newChapter(title: String, in manuscript: inout Manuscript) throws -> Chapter {
-        let stem = "chapters/\(Self.number(manuscript.chapters.count + 1))-\(Self.slug(title, fallback: "chapter"))"
+        let stem = "chapters/\(number(manuscript.chapters.count + 1))-\(Self.slug(title, fallback: "chapter"))"
         let used = Set(manuscript.chapters.map(\.folder))
         let tree = try repository.commit(try mainHead()).tree
         // A removed chapter's folder is gone from the tree with its scenes, but
@@ -589,7 +589,7 @@ public final class ProjectStore {
     /// `<chapter folder>/<NN>-<scene slug>.md`, numbered by the chapter's scene
     /// count at the time the scene is added.
     private func scenePath(for title: String, in chapter: Chapter, of manuscript: Manuscript, at head: ObjectID) throws -> String {
-        let stem = "\(Self.number(chapter.scenes.count + 1))-\(Self.slug(title, fallback: "scene"))"
+        let stem = "\(number(chapter.scenes.count + 1))-\(Self.slug(title, fallback: "scene"))"
         let listed = Set(manuscript.scenes.map(\.path))
         let tree = try repository.commit(head).tree
         // Reordering never renames files, so a fresh number can still collide.
@@ -611,9 +611,6 @@ public final class ProjectStore {
         return value
     }
 
-    private static func number(_ n: Int) -> String {
-        n < 10 ? "0\(n)" : "\(n)"
-    }
 
     /// A take's name as given, trimmed; an empty name is "Take".
     static func takeName(_ name: String) -> String {

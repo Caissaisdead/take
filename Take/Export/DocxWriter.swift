@@ -18,7 +18,7 @@ enum DocxWriter {
     static func attributedString(for manuscript: Manuscript, text: (SceneID) throws -> String) rethrows -> NSMutableAttributedString {
         let out = NSMutableAttributedString()
         out.append(heading(manuscript.title.isEmpty ? "Untitled" : manuscript.title, size: 20, centred: true, spaceBefore: 0))
-        let showsParts = manuscript.parts.count > 1 || manuscript.parts.contains { !$0.title.trimmingCharacters(in: .whitespaces).isEmpty }
+        let showsParts = manuscript.usesParts
         var chapterNumber = 0
         for (p, part) in manuscript.parts.enumerated() {
             if showsParts {

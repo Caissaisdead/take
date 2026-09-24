@@ -80,6 +80,12 @@ public struct Manuscript: Codable, Hashable, Sendable {
     public var chapters: [Chapter] { parts.flatMap(\.chapters) }
     public var scenes: [SceneRef] { chapters.flatMap(\.scenes) }
 
+    /// Whether parts are shown at all: when there is more than one, or any
+    /// has a title. One untitled part is no part.
+    public var usesParts: Bool {
+        parts.count > 1 || parts.contains { !$0.title.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
     public func part(_ id: UUID) -> Part? {
         parts.first { $0.id == id }
     }
@@ -199,6 +205,12 @@ public struct Manuscript: Codable, Hashable, Sendable {
         }
         throw ProjectStoreError.unknownScene(id)
     }
+}
+
+/// A chapter or scene number as folders and files carry it: two digits
+/// while there are fewer than a hundred.
+func number(_ n: Int) -> String {
+    n < 10 ? "0\(n)" : "\(n)"
 }
 
 /// One saved state of a scene, as shown in its history.

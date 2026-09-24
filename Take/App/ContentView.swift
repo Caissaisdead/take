@@ -304,9 +304,6 @@ private struct NameSheet: View {
     }
 }
 
-/// A keep that met a moved main: the three texts side by side, and a choice of
-/// whole scene. Paragraph-level picking is not offered; a writer's merge is a
-/// selection.
 /// Asked before the first send, and every time unless the writer says not to.
 private struct ConsentSheet: View {
     @Environment(ProjectModel.self) private var model
@@ -397,6 +394,9 @@ private struct ThreeTakesSheet: View {
     }
 }
 
+/// A keep that met a moved main: the three texts side by side, and a choice of
+/// whole scene. Paragraph-level picking is not offered; a writer's merge is a
+/// selection.
 private struct ConflictSheet: View {
     @Environment(ProjectModel.self) private var model
     @Environment(\.dismiss) private var dismiss

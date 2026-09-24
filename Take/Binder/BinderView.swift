@@ -59,8 +59,7 @@ struct BinderView: View {
 
     /// One untitled part is no part at all.
     private var showsPartHeaders: Bool {
-        let parts = model.manuscript.parts
-        return parts.count > 1 || parts.contains { !$0.title.isEmpty }
+        model.manuscript.usesParts
     }
 
     private var selectionBinding: Binding<SceneID?> {

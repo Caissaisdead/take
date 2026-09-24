@@ -21,7 +21,7 @@ public enum MarkdownExport {
     /// Every file, combined first. `text` reads a scene as stored.
     public static func files(for manuscript: Manuscript, text: (SceneID) throws -> String) rethrows -> [ExportFile] {
         var files = [ExportFile(path: "\(fileName(manuscript.title, fallback: "Manuscript")).md", data: Data(try combined(manuscript, text: text).utf8))]
-        let showsParts = usesParts(manuscript)
+        let showsParts = manuscript.usesParts
         var chapterNumber = 0
         for (p, part) in manuscript.parts.enumerated() {
             let partFolder = showsParts ? "\(number(p + 1)) \(fileName(part.title, fallback: "Part \(p + 1)"))/" : ""
@@ -42,7 +42,7 @@ public enum MarkdownExport {
     /// Scene titles are the writer's own labels and never appear.
     public static func combined(_ manuscript: Manuscript, text: (SceneID) throws -> String) rethrows -> String {
         var out = "# \(heading(manuscript.title, fallback: "Untitled"))\n"
-        let showsParts = usesParts(manuscript)
+        let showsParts = manuscript.usesParts
         let chapterMark = showsParts ? "###" : "##"
         var chapterNumber = 0
         for (p, part) in manuscript.parts.enumerated() {
@@ -65,14 +65,6 @@ public enum MarkdownExport {
         return out
     }
 
-    /// Parts are shown when there is more than one or any has a title.
-    static func usesParts(_ manuscript: Manuscript) -> Bool {
-        manuscript.parts.count > 1 || manuscript.parts.contains { !$0.title.trimmingCharacters(in: .whitespaces).isEmpty }
-    }
-
-    static func number(_ n: Int) -> String {
-        n < 10 ? "0\(n)" : "\(n)"
-    }
 
     /// A title as a file or folder name: no slashes or colons, no control
     /// characters, trimmed, never empty and never starting with a dot.
