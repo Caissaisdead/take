@@ -22,16 +22,36 @@ written side by side, then kept or discarded.
 - **Milestones** are annotated tags under `refs/tags/milestones/`, so the
   whole draft can be marked and any scene compared against how it stood.
 - **Compare** shows a paragraph-level diff, with word-level detail inside
-  paragraphs that changed, against any version or milestone.
+  paragraphs that changed, against any version or milestone. A link on each
+  paragraph that differs takes the other side, so a take can be folded into
+  main a paragraph at a time.
+- **Since** lists every scene against a milestone: the words that came and
+  went, the scenes added and gone.
 - **The map** draws a chapter as its scenes in a line with every take
   beneath.
+- **Each scene has a synopsis and notes**, kept in the manifest, shown in
+  the binder and on the map, and handed to the engines. `[[A note]]` in the
+  prose is dimmed on the page, listed in the Scene pane, and never exported.
+- **Find** (⇧⌘F) searches the whole draft, and the takes when asked; case
+  and accents do not matter.
+- **Counts and targets**: words per chapter and for the draft in the binder,
+  the day's words in the status bar, a target for the whole and for the day.
+- **Recently removed** scenes come back from history with their text and
+  their takes.
 - **Untangle** reads a scene on Apple's on-device model and fills a fixed
   template: the scene's job, the value shift, its beats, what the reader
   needs, and a smallest version. Nothing leaves the Mac.
 - **Three Takes** writes the open scene three ways on Claude, under the
-  writer's own API key, each take on its own angle. This is the one thing
-  that sends text off the Mac; a consent sheet says so first.
-- **Export** as a folder of Markdown or as a Word document.
+  writer's own API key, each take on its own angle. A consent sheet says so
+  first.
+- **Import** a Markdown or text file (headings and `* * *` become chapters
+  and scenes), a Word document, or a folder of Markdown files; a project
+  folder that lost its `.git` is taken in as it stands.
+- **Export** the draft or one chapter as a folder of Markdown, a Word
+  document or a PDF.
+- **Back Up** (⇧⌘B) pushes main, the milestones and every take to a remote
+  over HTTPS with a token from the keychain. This and Three Takes are the two
+  things that send anything off the Mac.
 
 ## Layout
 
@@ -72,7 +92,15 @@ between paragraphs and no hard wrapping; `Prose` in ManuscriptKit is the
 one place those rules live. The editor shows the same text with no blank
 lines, one paragraph per line, so a return is always a new paragraph.
 `*italic*`, `_italic_` and `**bold**` are dimmed in the editor and become
-real emphasis in exports; `* * *` on a line of its own is a scene break.
+real emphasis in exports; `* * *` on a line of its own is a scene break;
+`[[a note]]` is the writer's and leaves with no export.
+
+## The manifest
+
+`manuscript.json` is format 3: parts, chapters and scenes with their
+titles, paths, synopses and notes, and the word targets. A format-2 file
+(no synopses, notes or targets) opens as it is and is written back as 3 by
+its next commit.
 
 ## Commits
 
