@@ -280,8 +280,23 @@ final class ProjectModel {
         if isDirty { editorText = text }
     }
 
+    /// The open scene as the manifest has it, whether main or a take is showing.
+    var currentScene: SceneRef? {
+        selection.flatMap { manuscript.scene($0.sceneID) }
+    }
+
     var sceneTitle: String {
-        selection.flatMap { manuscript.scene($0.sceneID)?.title } ?? ""
+        currentScene?.title ?? ""
+    }
+
+    /// The scene's synopsis and notes into the manifest, when they changed.
+    func saveSceneNotes(synopsis: String, notes: String, for scene: SceneID) {
+        guard let store else { return }
+        attempt("Note") {
+            let head = try store.mainHead()
+            try store.update(scene: scene, synopsis: synopsis, notes: notes)
+            if try store.mainHead() != head { refresh() }
+        }
     }
 
     var selectionLabel: String {
@@ -561,8 +576,10 @@ final class ProjectModel {
         var delta: (added: Int, removed: Int)?
         /// Commits of the take's own, so a take never saved reads as empty.
         var saves: Int
+        /// The scene's synopsis, on main's node only.
+        var synopsis = ""
 
-        static func == (lhs: MapNode, rhs: MapNode) -> Bool { lhs.id == rhs.id && lhs.words == rhs.words && lhs.saves == rhs.saves }
+        static func == (lhs: MapNode, rhs: MapNode) -> Bool { lhs.id == rhs.id && lhs.words == rhs.words && lhs.saves == rhs.saves && lhs.synopsis == rhs.synopsis }
         func hash(into hasher: inout Hasher) { hasher.combine(id) }
     }
 
@@ -593,7 +610,7 @@ final class ProjectModel {
         for scene in chapter.scenes {
             do {
                 let mainText = try store.sceneText(scene.id)
-                let main = MapNode(id: "main:\(scene.id.uuid.uuidString)", kind: .main, title: scene.title, words: Prose.wordCount(mainText), delta: nil, saves: 0)
+                let main = MapNode(id: "main:\(scene.id.uuid.uuidString)", kind: .main, title: scene.title, words: Prose.wordCount(mainText), delta: nil, saves: 0, synopsis: scene.synopsis)
                 var takes: [MapNode] = []
                 for take in try store.takes(for: scene.id) {
                     takes.append(try node(for: take, against: mainText, discarded: false))
@@ -650,13 +667,14 @@ final class ProjectModel {
     func untangle() {
         guard selection != nil, !isUntangling else { return }
         let title = sceneTitle
+        let synopsis = currentScene?.synopsis ?? ""
         let text = storedText
         isUntangling = true
         untangleError = nil
         untangleTask?.cancel()
         untangleTask = Task {
             do {
-                let result = try await untangler.untangle(scene: title, text: text)
+                let result = try await untangler.untangle(scene: title, synopsis: synopsis, text: text)
                 guard !Task.isCancelled else { return }
                 untangling = result
                 statusLine = "Untangled \(title)"
@@ -714,6 +732,8 @@ final class ProjectModel {
         let brief = ThreeTakes.Brief(
             manuscriptTitle: manuscript.title,
             sceneTitle: sceneTitle,
+            synopsis: currentScene?.synopsis ?? "",
+            notes: currentScene?.notes ?? "",
             draft: (try? store.sceneText(scene)) ?? "",
             before: neighbour(of: scene, offset: -1).flatMap { try? store.sceneText($0) },
             after: neighbour(of: scene, offset: 1).flatMap { try? store.sceneText($0) },

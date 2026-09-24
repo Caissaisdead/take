@@ -24,6 +24,8 @@ enum ThreeTakes {
     struct Brief {
         var manuscriptTitle: String
         var sceneTitle: String
+        var synopsis: String = ""
+        var notes: String = ""
         var draft: String
         var before: String?
         var after: String?
@@ -47,6 +49,14 @@ enum ThreeTakes {
     static func prompt(for brief: Brief, angle: Angle, previous: [(angle: Angle, text: String)]) -> String {
         var parts: [String] = []
         parts.append("Manuscript: \(brief.manuscriptTitle)\nScene: \(brief.sceneTitle)")
+        let synopsis = brief.synopsis.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !synopsis.isEmpty {
+            parts.append("What the scene is for, in the writer's words: \(synopsis)")
+        }
+        let notes = brief.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !notes.isEmpty {
+            parts.append("The writer's notes on it:\n\n\(notes)")
+        }
         if let before = brief.before, !before.isEmpty {
             parts.append("The end of the scene before it:\n\n\(Prose.tail(before, words: neighbourWords))")
         }

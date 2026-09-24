@@ -2,7 +2,27 @@ import SwiftUI
 import ManuscriptKit
 
 struct ContentView: View {
-    enum InspectorTab: Hashable { case versions, compare, untangle }
+    enum InspectorTab: Hashable, CaseIterable {
+        case versions, compare, scene, untangle
+
+        var name: String {
+            switch self {
+            case .versions: return "Versions"
+            case .compare: return "Compare"
+            case .scene: return "Scene"
+            case .untangle: return "Untangle"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .versions: return "clock"
+            case .compare: return "doc.on.doc"
+            case .scene: return "note.text"
+            case .untangle: return "wand.and.sparkles"
+            }
+        }
+    }
 
     @Environment(ProjectModel.self) private var model
     @State private var showInspector = true
@@ -27,17 +47,22 @@ struct ContentView: View {
         .inspector(isPresented: $showInspector) {
             VStack(spacing: 0) {
                 Picker("Inspector", selection: $inspectorTab) {
-                    Text("Versions").tag(InspectorTab.versions)
-                    Text("Compare").tag(InspectorTab.compare)
-                    Text("Untangle").tag(InspectorTab.untangle)
+                    ForEach(InspectorTab.allCases, id: \.self) { tab in
+                        Image(systemName: tab.symbol)
+                            .help(tab.name)
+                            .tag(tab)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding(10)
+                .help(inspectorTab.name)
                 Divider()
                 switch inspectorTab {
                 case .versions:
                     VersionsView()
+                case .scene:
+                    SceneView()
                 case .compare:
                     Picker("Against", selection: $model.compareBase) {
                         ForEach(model.compareChoices, id: \.base) { choice in

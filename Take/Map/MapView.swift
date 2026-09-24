@@ -211,6 +211,7 @@ private struct NodeView: View {
 
     private var detail: String {
         var parts = ["\(node.words) words"]
+        if !node.synopsis.isEmpty { parts.insert(node.synopsis, at: 0) }
         if let delta = node.delta {
             parts.append(delta.added == 0 && delta.removed == 0 ? "same as main" : "+\(delta.added) −\(delta.removed) vs main")
         }
