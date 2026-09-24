@@ -6,6 +6,7 @@ struct ContentView: View {
 
     @Environment(ProjectModel.self) private var model
     @State private var showInspector = true
+    @State private var showMap = false
     @State private var inspectorTab: InspectorTab = .versions
     @State private var compareDiff: ProseDiff?
     @State private var compareRefresh: Task<Void, Never>?
@@ -17,7 +18,11 @@ struct ContentView: View {
             BinderView()
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
-            DetailView()
+            if showMap {
+                MapView()
+            } else {
+                DetailView()
+            }
         }
         .inspector(isPresented: $showInspector) {
             VStack(spacing: 0) {
@@ -68,6 +73,10 @@ struct ContentView: View {
                     .toggleStyle(.button)
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                     .help("Compare the editor with another version (⇧⌘D)")
+                Toggle("Map", systemImage: "map", isOn: $showMap)
+                    .toggleStyle(.button)
+                    .keyboardShortcut("m", modifiers: [.command, .option])
+                    .help("Map the chapter: scenes in a line, takes beneath (⌥⌘M)")
                 Toggle("Inspector", systemImage: "sidebar.right", isOn: $showInspector)
                     .toggleStyle(.button)
             }

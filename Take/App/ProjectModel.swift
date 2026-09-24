@@ -385,6 +385,98 @@ final class ProjectModel {
         if isDirty { save() }
     }
 
+    // MARK: - Map
+
+    /// One box on the chapter map.
+    struct MapNode: Identifiable, Hashable {
+        enum Kind: Hashable {
+            case main
+            case take(Take)
+            case discarded(Take)
+        }
+
+        var id: String
+        var kind: Kind
+        var title: String
+        var words: Int
+        /// Words added and removed against main; nil for main itself.
+        var delta: (added: Int, removed: Int)?
+        /// Commits of the take's own, so a take never saved reads as empty.
+        var saves: Int
+
+        static func == (lhs: MapNode, rhs: MapNode) -> Bool { lhs.id == rhs.id && lhs.words == rhs.words && lhs.saves == rhs.saves }
+        func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    }
+
+    /// A scene on the map: main on the line, its takes hanging below.
+    struct MapColumn: Identifiable {
+        var id: SceneID { scene.id }
+        var scene: SceneRef
+        var main: MapNode
+        var takes: [MapNode]
+    }
+
+    /// Bumped by every refresh, so the map knows when to rebuild.
+    private(set) var mapVersion = 0
+
+    /// The chapter the map shows; nil means the open scene's chapter.
+    var mapChapter: UUID?
+
+    var mapChapterID: UUID? {
+        mapChapter.flatMap { manuscript.chapter($0)?.id } ?? currentChapter
+    }
+
+    /// Every scene of the chapter with its live and discarded takes, each
+    /// measured against main. Diffs run here, so call it when the map shows,
+    /// not on every keystroke.
+    func chapterMap(_ chapterID: UUID) -> [MapColumn] {
+        guard let store, let chapter = manuscript.chapter(chapterID) else { return [] }
+        var columns: [MapColumn] = []
+        for scene in chapter.scenes {
+            do {
+                let mainText = try store.sceneText(scene.id)
+                let main = MapNode(id: "main:\(scene.id.uuid.uuidString)", kind: .main, title: scene.title, words: Prose.wordCount(mainText), delta: nil, saves: 0)
+                var takes: [MapNode] = []
+                for take in try store.takes(for: scene.id) {
+                    takes.append(try node(for: take, against: mainText, discarded: false))
+                }
+                for take in try store.discardedTakes(for: scene.id) {
+                    takes.append(try node(for: take, against: mainText, discarded: true))
+                }
+                columns.append(MapColumn(scene: scene, main: main, takes: takes))
+            } catch {
+                statusLine = "Map failed: \(error)"
+            }
+        }
+        return columns
+    }
+
+    private func node(for take: Take, against mainText: String, discarded: Bool) throws -> MapNode {
+        guard let store else { throw ProjectStoreError.unbornMain }
+        let text = try store.takeText(take)
+        let summary = ProseDiffer.diff(old: mainText, new: text).summary
+        let saves = try store.repository.log(from: take.head, limit: 200).prefix { $0.id != take.base }.count
+        return MapNode(
+            id: take.id,
+            kind: discarded ? .discarded(take) : .take(take),
+            title: take.title,
+            words: Prose.wordCount(text),
+            delta: (summary.wordsAdded, summary.wordsRemoved),
+            saves: saves)
+    }
+
+    /// Opens what a map node stands for. A discarded take only reports itself.
+    func open(_ node: MapNode) {
+        switch node.kind {
+        case .main:
+            if let id = SceneID(mapID: node.id) { select(.main(id)) }
+        case .take(let take):
+            select(.take(take))
+        case .discarded(let take):
+            statusLine = "\(take.title) was discarded; its ref is \(take.id)"
+        }
+    }
+
     // MARK: - Export
 
     /// The draft on main as Markdown, after saving whatever is unsaved so the
@@ -576,6 +668,7 @@ final class ProjectModel {
 
     private func refresh() {
         guard let store else { return }
+        mapVersion += 1
         attempt("Refresh") {
             manuscript = try store.manifest()
             milestones = try store.milestones()
@@ -676,5 +769,13 @@ extension Take {
     var title: String {
         let words = name.replacingOccurrences(of: "-", with: " ")
         return words.prefix(1).uppercased() + words.dropFirst()
+    }
+}
+
+extension SceneID {
+    /// The scene behind a `main:` map node id.
+    fileprivate init?(mapID: String) {
+        guard mapID.hasPrefix("main:"), let uuid = UUID(uuidString: String(mapID.dropFirst(5))) else { return nil }
+        self.init(uuid: uuid)
     }
 }

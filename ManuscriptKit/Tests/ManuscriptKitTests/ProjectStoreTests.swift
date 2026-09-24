@@ -453,6 +453,13 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             try store.discard(second)
             #expect(try store.repository.resolve("refs/discarded/\(uuid)/alt") == take.head)
             #expect(try store.repository.resolve("refs/discarded/\(uuid)/alt-2") == second.head)
+
+            let discarded = try store.discardedTakes(for: scene.id)
+            #expect(discarded.map(\.name) == ["alt", "alt-2"])
+            #expect(discarded.map(\.head) == [take.head, second.head])
+            #expect(discarded.map(\.base) == [take.base, second.base])
+            #expect(try store.takeText(discarded[1]) == "Alt again.\n")
+            #expect(try store.discardedTakes(for: SceneID()).isEmpty)
         }
     }
 

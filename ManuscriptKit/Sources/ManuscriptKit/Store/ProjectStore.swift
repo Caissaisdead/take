@@ -306,6 +306,20 @@ public final class ProjectStore {
         return takes
     }
 
+    /// Takes discarded from this scene, under `refs/discarded/`, oldest first.
+    /// Their base is the merge base with main today, as for live takes.
+    public func discardedTakes(for scene: SceneID) throws -> [Take] {
+        let head = try mainHead()
+        let prefix = Self.discardedPrefix + scene.uuid.uuidString.lowercased() + "/"
+        var takes: [Take] = []
+        for ref in try repository.refs(withPrefix: prefix) {
+            guard let takeHead = try repository.resolve(ref) else { continue }
+            let base = try repository.mergeBase(head, takeHead) ?? takeHead
+            takes.append(Take(id: ref, scene: scene, name: String(ref.dropFirst(prefix.count)), base: base, head: takeHead))
+        }
+        return takes
+    }
+
     public func takeText(_ take: Take) throws -> String {
         try sceneText(take.scene, at: take.head)
     }
