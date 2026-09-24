@@ -1,14 +1,19 @@
 import Foundation
 import Security
 
-/// The writer's Anthropic API key, in the keychain and nowhere else: not in
-/// UserDefaults, which any process in the sandbox can read, and never in the
-/// project, which is the one thing the app exports.
-enum APIKeyStore {
-    private static let service = "com.siddharthnigam.take.anthropic"
-    private static let account = "api-key"
+/// One secret in the keychain and nowhere else: not in UserDefaults, which
+/// any process in the sandbox can read, and never in the project, which is
+/// the one thing the app exports.
+struct KeychainItem {
+    let service: String
+    let account: String
 
-    static func read() -> String? {
+    /// The writer's Anthropic API key.
+    static let anthropicKey = KeychainItem(service: "com.siddharthnigam.take.anthropic", account: "api-key")
+    /// The token a backup pushes with.
+    static let backupToken = KeychainItem(service: "com.siddharthnigam.take.backup", account: "token")
+
+    func read() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -20,14 +25,14 @@ enum APIKeyStore {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data
         else { return nil }
-        let key = String(decoding: data, as: UTF8.self)
-        return key.isEmpty ? nil : key
+        let value = String(decoding: data, as: UTF8.self)
+        return value.isEmpty ? nil : value
     }
 
-    /// An empty key removes the item.
+    /// An empty value removes the item.
     @discardableResult
-    static func write(_ key: String) -> Bool {
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+    func write(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -40,4 +45,12 @@ enum APIKeyStore {
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
     }
+}
+
+/// The Anthropic key, as the engines have always asked for it.
+enum APIKeyStore {
+    static func read() -> String? { KeychainItem.anthropicKey.read() }
+
+    @discardableResult
+    static func write(_ key: String) -> Bool { KeychainItem.anthropicKey.write(key) }
 }

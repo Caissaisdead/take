@@ -266,6 +266,71 @@ final class ProjectModel {
         }
     }
 
+    // MARK: - Backup
+
+    /// The remote the open project backs up to, kept per project folder.
+    var backupRemote: String {
+        get { projectURL.flatMap { UserDefaults.standard.string(forKey: Self.backupKey($0)) } ?? "" }
+        set {
+            guard let projectURL else { return }
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                UserDefaults.standard.removeObject(forKey: Self.backupKey(projectURL))
+            } else {
+                UserDefaults.standard.set(trimmed, forKey: Self.backupKey(projectURL))
+            }
+            backupVersion += 1
+        }
+    }
+
+    /// Changes with the remote, so views that show it follow.
+    private(set) var backupVersion = 0
+    private(set) var isBackingUp = false
+    private(set) var lastBackup: Date?
+
+    private static func backupKey(_ url: URL) -> String {
+        "BackupRemote:" + url.standardizedFileURL.path
+    }
+
+    /// Pushes main, the milestones and every take to the remote, after
+    /// saving what is unsaved. The push runs off the main thread on a
+    /// repository of its own.
+    func backUp() {
+        guard let projectURL, !isBackingUp else { return }
+        let remote = backupRemote
+        guard !remote.isEmpty else {
+            statusLine = "Set a backup remote in Settings first"
+            return
+        }
+        settle()
+        guard !isDirty else { return }
+        let token = KeychainItem.backupToken.read()
+        isBackingUp = true
+        statusLine = "Backing up to \(remote)…"
+        Task {
+            let result: Result<Void, Error> = await Task.detached {
+                Result { try ProjectStore.backUp(projectAt: projectURL, to: remote, token: token) }
+            }.value
+            isBackingUp = false
+            switch result {
+            case .success:
+                lastBackup = Date()
+                statusLine = "Backed up to \(remote)"
+            case .failure(let error):
+                statusLine = "Backup failed: \(Self.plain(error))"
+            }
+        }
+    }
+
+    /// libgit2's words for the usual failures, in the writer's.
+    private static func plain(_ error: Error) -> String {
+        let text = error.localizedDescription
+        if text.localizedCaseInsensitiveContains("turned away") { return "the remote has changes this Mac does not; pull them with git before backing up again" }
+        if text.localizedCaseInsensitiveContains("auth") || text.contains("401") || text.contains("403") { return "the remote refused the token; check it in Settings" }
+        if text.localizedCaseInsensitiveContains("resolve") || text.localizedCaseInsensitiveContains("connect") { return "the remote could not be reached" }
+        return text
+    }
+
     /// A project folder without its repository becomes one again, in place.
     private func adopt(_ url: URL) {
         settle()
