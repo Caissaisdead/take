@@ -41,6 +41,8 @@ public enum ProjectStoreError: Error, Equatable, Sendable, LocalizedError {
 public final class ProjectStore {
     public let repository: Repository
     public var author: Signature
+    /// The moment a commit is stamped with; the clock, unless a test says otherwise.
+    public var clock: () -> Date = { Date() }
 
     public static let mainRef = "refs/heads/main"
     public static let takesPrefix = "refs/takes/"
@@ -54,6 +56,10 @@ public final class ProjectStore {
     /// that read ran back to the root. A later read walks only the commits
     /// since, then goes on with what it had.
     private var historyCache: [SceneID: (head: ObjectID, versions: [Version], exhausted: Bool)] = [:]
+    /// Words per blob, so a refresh counts only the scene that changed.
+    private var wordsByBlob: [ObjectID: Int] = [:]
+    /// The commit a day began at, found once per day.
+    private var dayStart: (day: Date, commit: ObjectID?)?
 
     // MARK: - Opening
 
@@ -339,6 +345,46 @@ public final class ProjectStore {
         return Array(versions.prefix(limit))
     }
 
+    // MARK: - Counting
+
+    /// Words per scene, notes left out, at `commit` or at main's head.
+    public func wordCounts(at commit: ObjectID? = nil) throws -> [SceneID: Int] {
+        let at = try commit ?? mainHead()
+        let tree = try repository.commit(at).tree
+        var counts: [SceneID: Int] = [:]
+        for scene in try manifest(at: at).scenes {
+            guard let entry = try repository.entry(atPath: scene.path, inTree: tree) else { continue }
+            if let known = wordsByBlob[entry.id] {
+                counts[scene.id] = known
+            } else {
+                let words = Prose.wordCount(Prose.withoutNotes(try text(of: entry.id)))
+                wordsByBlob[entry.id] = words
+                counts[scene.id] = words
+            }
+        }
+        return counts
+    }
+
+    /// The draft's words as `day` began: at the last commit on main made
+    /// before that day's midnight, or nil when the whole draft is younger.
+    public func wordCountAtStart(of day: Date, calendar: Calendar = .current) throws -> Int? {
+        let midnight = calendar.startOfDay(for: day)
+        let head = try mainHead()
+        let start: ObjectID?
+        if let dayStart, dayStart.day == midnight {
+            start = dayStart.commit
+        } else {
+            var commit: CommitInfo? = try repository.commit(head)
+            while let c = commit, c.author.time >= midnight {
+                commit = try c.parents.first.map { try repository.commit($0) }
+            }
+            start = commit?.id
+            dayStart = (midnight, start)
+        }
+        guard let start else { return nil }
+        return try wordCounts(at: start).values.reduce(0, +)
+    }
+
     // MARK: - Export
 
     /// The draft on main as Markdown files, combined draft first.
@@ -549,7 +595,7 @@ public final class ProjectStore {
 
     /// `author` says who; each commit is stamped with the moment it is made.
     private func stamp() -> Signature {
-        Signature(name: author.name, email: author.email)
+        Signature(name: author.name, email: author.email, time: clock())
     }
 
     private func sceneRef(_ id: SceneID) throws -> SceneRef {

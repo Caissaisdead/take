@@ -78,6 +78,13 @@ final class ProjectModel {
     private(set) var history: [Version] = []
     private(set) var milestones: [Milestone] = []
     private(set) var wordCount = 0
+    /// Words per scene on main, notes left out, as of the last refresh.
+    private(set) var sceneWords: [SceneID: Int] = [:]
+    private(set) var totalWords = 0
+    /// Words added to main since the day began; negative when the day cut.
+    private(set) var wordsToday = 0
+    /// The targets sheet, up until the writer closes it.
+    var showTargets = false
     private(set) var lastLoadMillis: Double?
     var statusLine = ""
     var conflict: Conflict?
@@ -358,6 +365,22 @@ final class ProjectModel {
             showInText(paragraph: match.paragraph, location: match.location, length: match.length)
         } else {
             select(target, selecting: (match.paragraph, match.location, match.length))
+        }
+    }
+
+    /// Words on main across the chapter's scenes.
+    func words(in chapter: Chapter) -> Int {
+        chapter.scenes.reduce(0) { $0 + (sceneWords[$1.id] ?? 0) }
+    }
+
+    /// The draft's targets, nil to clear one. Saved whatever is dirty first,
+    /// so the count the sheet showed is the count the target is set against.
+    func setTargets(_ target: Int?, daily: Int?) {
+        guard let store else { return }
+        settle()
+        attempt("Targets") {
+            try store.setTargets(target.flatMap { $0 > 0 ? $0 : nil }, daily: daily.flatMap { $0 > 0 ? $0 : nil })
+            refresh()
         }
     }
 
@@ -1056,6 +1079,10 @@ final class ProjectModel {
         attempt("Refresh") {
             manuscript = try store.manifest()
             milestones = try store.milestones()
+            sceneWords = try store.wordCounts()
+            totalWords = sceneWords.values.reduce(0, +)
+            let atDayStart = try store.wordCountAtStart(of: Date()) ?? 0
+            wordsToday = totalWords - atDayStart
             guard let scene = selection?.sceneID else {
                 takes = []
                 discarded = []

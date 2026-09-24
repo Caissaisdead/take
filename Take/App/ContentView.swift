@@ -115,6 +115,9 @@ struct ContentView: View {
                     .toggleStyle(.button)
             }
         }
+        .sheet(isPresented: $model.showTargets) {
+            TargetsSheet()
+        }
         .sheet(item: $model.naming) { naming in
             NameSheet(naming: naming)
         }
@@ -228,6 +231,10 @@ private struct StatusBar: View {
             }
             Text("\(model.wordCount) words")
                 .monospacedDigit()
+            Text(today)
+                .monospacedDigit()
+                .foregroundStyle(model.manuscript.dailyTarget.map { model.wordsToday >= $0 } == true ? Color.green : Color.secondary)
+                .help("Words added to the draft since midnight, counted at each save")
             if ProjectModel.isBenchRequested, let millis = model.lastLoadMillis {
                 Text(String(format: "load %.1f ms", millis))
                     .monospacedDigit()
@@ -242,6 +249,54 @@ private struct StatusBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.bar)
+    }
+
+    private var today: String {
+        let signed = model.wordsToday >= 0 ? "+\(model.wordsToday.formatted())" : "−\((-model.wordsToday).formatted())"
+        if let daily = model.manuscript.dailyTarget {
+            return "today \(signed) of \(daily.formatted())"
+        }
+        return "today \(signed)"
+    }
+}
+
+/// The draft's targets: words for the whole, and words a day. Both live in
+/// the manifest, so they travel with the project.
+private struct TargetsSheet: View {
+    @Environment(ProjectModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var target: Int?
+    @State private var daily: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Targets")
+                .font(.headline)
+            Form {
+                TextField("Whole draft", value: $target, format: .number, prompt: Text("e.g. 90,000"))
+                TextField("Each day", value: $daily, format: .number, prompt: Text("e.g. 1,000"))
+            }
+            .formStyle(.columns)
+            Text("\(model.totalWords.formatted()) words on main now; leave a field empty for no target.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Set") {
+                    model.setTargets(target, daily: daily)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
+        .onAppear {
+            target = model.manuscript.target
+            daily = model.manuscript.dailyTarget
+        }
     }
 }
 
