@@ -182,6 +182,39 @@ public final class Repository {
         return ObjectID(oid)
     }
 
+    // MARK: - Tags
+
+    /// Writes an annotated tag on `target` and the ref `refs/tags/<name>` for it.
+    /// The name may hold slashes. Fails when the ref exists.
+    @discardableResult
+    public func createTag(_ name: String, target: ObjectID, tagger: Signature, message: String) throws -> ObjectID {
+        var targetOid = target.raw
+        let object = try lookup("git_object_lookup") { git_object_lookup($0, pointer, &targetOid, GIT_OBJECT_COMMIT) }
+        defer { git_object_free(object) }
+        let signature = try makeSignature(tagger)
+        defer { git_signature_free(signature) }
+        var oid = git_oid()
+        try check(git_tag_create(&oid, pointer, name, object, signature, message, 0), "git_tag_create")
+        return ObjectID(oid)
+    }
+
+    /// Reads the tag object a tag ref resolves to.
+    public func tag(_ id: ObjectID) throws -> TagInfo {
+        var oid = id.raw
+        let tag = try lookup("git_tag_lookup") { git_tag_lookup($0, pointer, &oid) }
+        defer { git_tag_free(tag) }
+        let tagger = git_tag_tagger(tag)?.pointee
+        return TagInfo(
+            id: ObjectID(git_tag_id(tag)),
+            name: String(cString: git_tag_name(tag)),
+            target: ObjectID(git_tag_target_id(tag)),
+            tagger: Signature(
+                name: tagger.map { String(cString: $0.name) } ?? "",
+                email: tagger.map { String(cString: $0.email) } ?? "",
+                time: Date(timeIntervalSince1970: TimeInterval(tagger?.when.time ?? 0))),
+            message: git_tag_message(tag).map { String(cString: $0) } ?? "")
+    }
+
     // MARK: - Refs
 
     /// Resolves a full ref name (`refs/heads/main`, `HEAD`) to a commit, or nil

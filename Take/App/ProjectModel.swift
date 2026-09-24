@@ -39,6 +39,7 @@ final class ProjectModel {
         /// A chapter at the end of `part`, or of the open scene's part.
         case chapter(part: UUID?)
         case part
+        case milestone
         case rename(BinderItem)
 
         var id: Self { self }
@@ -69,6 +70,7 @@ final class ProjectModel {
     private(set) var isDirty = false
     private(set) var takes: [Take] = []
     private(set) var history: [Version] = []
+    private(set) var milestones: [Milestone] = []
     private(set) var wordCount = 0
     private(set) var lastLoadMillis: Double?
     var statusLine = ""
@@ -183,11 +185,33 @@ final class ProjectModel {
     }
 
     func restore(version: Version) {
+        restore(at: version.id, label: version.id.short)
+    }
+
+    /// The scene as it stood at the milestone, into the editor, unsaved.
+    func restore(milestone: Milestone) {
+        restore(at: milestone.commit, label: milestone.name)
+    }
+
+    private func restore(at commit: ObjectID, label: String) {
         guard let store, let scene = selection?.sceneID else { return }
         attempt("Restore") {
-            let text = try store.sceneText(scene, at: version.id)
+            let text = try store.sceneText(scene, at: commit)
             setEditorText(text, dirty: true)
-            statusLine = "Restored \(version.id.short) into the editor, unsaved"
+            statusLine = "Restored \(label) into the editor, unsaved"
+        }
+    }
+
+    /// Marks the whole draft as it is saved now. Unsaved text is saved first,
+    /// so the milestone means what the writer sees.
+    func markMilestone(named name: String) {
+        guard let store else { return }
+        settle()
+        guard !isDirty else { return }
+        attempt("Milestone") {
+            let milestone = try store.milestone(named: name)
+            refresh()
+            statusLine = "Marked \(milestone.name) at \(milestone.commit.short)"
         }
     }
 
@@ -455,6 +479,7 @@ final class ProjectModel {
         guard let store else { return }
         attempt("Refresh") {
             manuscript = try store.manifest()
+            milestones = try store.milestones()
             guard let scene = selection?.sceneID else {
                 takes = []
                 history = []

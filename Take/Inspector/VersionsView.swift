@@ -25,6 +25,18 @@ struct VersionsView: View {
                             .selectionDisabled()
                     }
                 }
+                Section("Milestones") {
+                    ForEach(model.milestones) { milestone in
+                        MilestoneRow(milestone: milestone)
+                            .selectionDisabled()
+                    }
+                    if model.milestones.isEmpty {
+                        Text("None marked yet")
+                            .foregroundStyle(.tertiary)
+                            .italic()
+                            .selectionDisabled()
+                    }
+                }
                 Section("History") {
                     ForEach(model.history) { version in
                         VersionRow(version: version)
@@ -68,6 +80,32 @@ struct VersionsView: View {
     }
 }
 
+private struct MilestoneRow: View {
+    @Environment(ProjectModel.self) private var model
+    let milestone: Milestone
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "flag.fill")
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(milestone.name)
+                    .lineLimit(1)
+                Text(milestone.date, format: .dateTime.month(.abbreviated).day().hour().minute())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            Button("Restore") { model.restore(milestone: milestone) }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .help("Load this scene as it stood at the milestone, unsaved")
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 private struct VersionRow: View {
     @Environment(ProjectModel.self) private var model
     let version: Version
@@ -96,7 +134,6 @@ private struct VersionRow: View {
     private var icon: String {
         switch version.kind {
         case .checkpoint: return "circle.fill"
-        case .milestone: return "flag.fill"
         case .keep: return "arrow.triangle.merge"
         }
     }

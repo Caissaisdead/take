@@ -23,6 +23,11 @@ struct TakeApp: App {
                 Button("Save") { model.save() }
                     .keyboardShortcut("s", modifiers: .command)
             }
+            CommandMenu("Draft") {
+                Button("Mark Milestone…") { model.naming = .milestone }
+                    .keyboardShortcut("m", modifiers: .command)
+                    .disabled(model.manuscript.scenes.isEmpty)
+            }
             CommandMenu("Take") {
                 Button("New Take…") { model.naming = .take }
                     .keyboardShortcut("t", modifiers: [.command, .shift])

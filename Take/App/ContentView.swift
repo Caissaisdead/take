@@ -47,6 +47,9 @@ struct ContentView: View {
                     .disabled(model.selection == nil)
                 Button("New Take") { model.naming = .take }
                     .disabled(model.selection == nil)
+                Button("Milestone", systemImage: "flag") { model.naming = .milestone }
+                    .help("Mark the whole draft as it stands (⌘M)")
+                    .disabled(model.manuscript.scenes.isEmpty)
                 if model.isInTake {
                     Button("Keep") { model.keep() }
                     Button("Discard") { confirmDiscard = true }
@@ -200,6 +203,7 @@ private struct NameSheet: View {
         case .scene: return "New scene"
         case .chapter: return "New chapter"
         case .part: return "New part"
+        case .milestone: return "Mark a milestone"
         case .rename(let item):
             switch item {
             case .part: return "Rename part"
@@ -215,13 +219,17 @@ private struct NameSheet: View {
         case .scene: return "Scene title"
         case .chapter: return "Chapter title"
         case .part: return "Part title"
+        case .milestone: return "Milestone name, e.g. First draft"
         case .rename: return "Title"
         }
     }
 
     private var verb: String {
-        if case .rename = naming { return "Rename" }
-        return "Create"
+        switch naming {
+        case .rename: return "Rename"
+        case .milestone: return "Mark"
+        default: return "Create"
+        }
     }
 
     private var initialName: String {
@@ -230,6 +238,7 @@ private struct NameSheet: View {
         case .scene: return ""
         case .chapter: return "Chapter \(model.manuscript.chapters.count + 1)"
         case .part: return "Part \(model.manuscript.parts.count + 1)"
+        case .milestone: return ""
         case .rename(let item): return model.title(of: item)
         }
     }
@@ -245,6 +254,7 @@ private struct NameSheet: View {
         case .scene(let chapter, let after): model.addScene(named: trimmed, inChapter: chapter, after: after)
         case .chapter(let part): model.addChapter(named: trimmed, inPart: part)
         case .part: model.addPart(named: trimmed)
+        case .milestone: model.markMilestone(named: trimmed)
         case .rename(let item): model.rename(item, to: trimmed)
         }
         dismiss()

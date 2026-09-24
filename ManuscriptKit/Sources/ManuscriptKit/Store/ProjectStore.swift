@@ -24,6 +24,7 @@ public final class ProjectStore {
     public static let mainRef = "refs/heads/main"
     public static let takesPrefix = "refs/takes/"
     public static let discardedPrefix = "refs/discarded/"
+    public static let milestonesPrefix = "refs/tags/milestones/"
 
     // MARK: - Opening
 
@@ -222,12 +223,30 @@ public final class ProjectStore {
         return try commitIndex(message: message ?? "Checkpoint: \(scene.title)", parents: [head])
     }
 
-    /// A named version of the whole draft: a commit on main with the same tree.
+    /// Marks main's head as a milestone: an annotated tag, so the draft itself
+    /// gains no commit. The tag carries the name as given; the ref is slugged
+    /// and made unique.
     @discardableResult
-    public func milestone(named name: String) throws -> ObjectID {
+    public func milestone(named name: String) throws -> Milestone {
         let head = try mainHead()
-        let tree = try repository.commit(head).tree
-        return try repository.createCommit(tree: tree, parents: [head], author: stamp(), message: "Milestone: \(name)", updatingRef: Self.mainRef)
+        let taken = Set(try repository.refs(withPrefix: Self.milestonesPrefix))
+        let ref = Self.unique(Self.milestonesPrefix + Self.slug(name, fallback: "milestone")) { taken.contains($0) }
+        let tag = try repository.createTag(String(ref.dropFirst("refs/tags/".count)), target: head, tagger: stamp(), message: name)
+        let info = try repository.tag(tag)
+        return Milestone(id: ref, name: name, commit: head, date: info.tagger.time)
+    }
+
+    /// Every milestone, newest first.
+    public func milestones() throws -> [Milestone] {
+        var milestones: [Milestone] = []
+        for ref in try repository.refs(withPrefix: Self.milestonesPrefix) {
+            guard let id = try repository.resolve(ref) else { continue }
+            let tag = try repository.tag(id)
+            let name = tag.message.trimmingCharacters(in: .whitespacesAndNewlines)
+            milestones.append(Milestone(id: ref, name: name.isEmpty ? tag.name : name, commit: tag.target, date: tag.tagger.time))
+        }
+        // Two in the same second fall back to their refs, so a `-2` follows its original.
+        return milestones.sorted { ($0.date, $0.id) > ($1.date, $1.id) }
     }
 
     /// The commits on main that changed this scene, newest first.
@@ -242,14 +261,7 @@ public final class ProjectStore {
             let parent = try commit.parents.first.map { try repository.commit($0) }
             let theirs = try parent.flatMap { try repository.entry(atPath: path, inTree: $0.tree)?.id }
             if let mine, mine != theirs {
-                let kind: Version.Kind
-                if commit.message.hasPrefix("Milestone: ") {
-                    kind = .milestone
-                } else if commit.parents.count == 2 {
-                    kind = .keep
-                } else {
-                    kind = .checkpoint
-                }
+                let kind: Version.Kind = commit.parents.count == 2 ? .keep : .checkpoint
                 versions.append(Version(id: commit.id, date: commit.author.time, message: commit.message, kind: kind))
             }
             guard let parent else { break }

@@ -203,7 +203,7 @@ public struct Manuscript: Codable, Hashable, Sendable {
 
 /// One saved state of a scene, as shown in its history.
 public struct Version: Hashable, Sendable, Identifiable {
-    public enum Kind: Sendable { case checkpoint, milestone, keep }
+    public enum Kind: Sendable { case checkpoint, keep }
 
     public var id: ObjectID
     public var date: Date
@@ -215,6 +215,26 @@ public struct Version: Hashable, Sendable, Identifiable {
         self.date = date
         self.message = message
         self.kind = kind
+    }
+}
+
+/// A named state of the whole draft: an annotated tag on a main commit under
+/// `refs/tags/milestones/<slug>`. Nothing in the draft changes when one is
+/// marked; the scene that did not move still has this as a version to compare
+/// against.
+public struct Milestone: Hashable, Sendable, Identifiable {
+    /// The full ref name.
+    public var id: String
+    public var name: String
+    /// The main commit the milestone marks.
+    public var commit: ObjectID
+    public var date: Date
+
+    public init(id: String, name: String, commit: ObjectID, date: Date) {
+        self.id = id
+        self.name = name
+        self.commit = commit
+        self.date = date
     }
 }
 

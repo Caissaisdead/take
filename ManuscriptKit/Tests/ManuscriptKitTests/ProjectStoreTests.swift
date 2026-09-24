@@ -259,16 +259,37 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
-    @Test func milestoneKeepsTheTree() throws {
+    @Test func milestoneIsATagAndMovesNothing() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "One.\n")
             let before = try store.mainHead()
-            let milestone = try store.milestone(named: "First draft")
-            let info = try store.repository.commit(milestone)
-            #expect(info.parents == [before])
-            #expect(info.tree == (try store.repository.commit(before).tree))
-            #expect(info.message == "Milestone: First draft")
-            #expect(try store.mainHead() == milestone)
+
+            let first = try store.milestone(named: "First Draft!")
+            #expect(first.id == "refs/tags/milestones/first-draft")
+            #expect(first.name == "First Draft!")
+            #expect(first.commit == before)
+            #expect(abs(first.date.timeIntervalSinceNow) < 60)
+            #expect(try store.mainHead() == before)
+            #expect(try store.history(of: scene.id).count == 1)
+
+            // A second milestone of the same name keeps its name and gets its own ref.
+            try store.checkpoint(scene.id, text: "One. Two.\n")
+            let second = try store.milestone(named: "first draft")
+            #expect(second.id == "refs/tags/milestones/first-draft-2")
+            #expect(second.commit == (try store.mainHead()))
+
+            let listed = try store.milestones()
+            #expect(listed.map(\.id) == [second.id, first.id])
+            #expect(listed.map(\.name) == ["first draft", "First Draft!"])
+            #expect(listed.map(\.commit) == [second.commit, first.commit])
+            #expect(try store.sceneText(scene.id, at: first.commit) == "One.\n")
+            #expect(try store.sceneText(scene.id, at: second.commit) == "One. Two.\n")
+
+            // System git sees annotated tags with the name as the message.
+            #expect(try git("tag", "-l", "-n1", "milestones/*", in: url) == "milestones/first-draft First Draft!\nmilestones/first-draft-2 first draft\n")
+            #expect(try git("rev-parse", "milestones/first-draft^{commit}", in: url).trimmingCharacters(in: .whitespacesAndNewlines) == before.hex)
+            #expect(try git("log", "--oneline", in: url).contains("Milestone") == false)
         }
     }
 
