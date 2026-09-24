@@ -176,7 +176,7 @@ final class ProjectModel {
             } else {
                 guard seedingSample || Self.isEmptyFolder(url) else {
                     scoped?.stopAccessingSecurityScopedResource()
-                    statusLine = "\(url.lastPathComponent) has files in it and is not a Take project; choose an empty folder"
+                    statusLine = "\(url.lastPathComponent) has files in it and is not a Take project; choose an empty folder, or File > Import to take it in"
                     return
                 }
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -220,6 +220,65 @@ final class ProjectModel {
         Task {
             if let url = await ProjectPanels.chooseNewProjectFolder() { open(url) }
         }
+    }
+
+    /// Reads a manuscript from a file or a folder into a new project, or takes
+    /// in a project folder that has its manifest but no repository.
+    func importProject() {
+        guard !isWritingTakes else {
+            statusLine = "Three Takes is still writing; stop it before importing"
+            return
+        }
+        Task {
+            guard let source = await ProjectPanels.chooseImport() else { return }
+            let granted = source.startAccessingSecurityScopedResource()
+            defer { if granted { source.stopAccessingSecurityScopedResource() } }
+            if FileManager.default.fileExists(atPath: source.appendingPathComponent(Manuscript.manifestPath).path),
+               !FileManager.default.fileExists(atPath: source.appendingPathComponent(".git").path) {
+                adopt(source)
+                return
+            }
+            let draft: Draft
+            do {
+                draft = try ManuscriptReader.draft(from: source)
+            } catch {
+                statusLine = "Import failed: \(error.localizedDescription)"
+                return
+            }
+            let counts = "\(draft.chapters.count) \(draft.chapters.count == 1 ? "chapter" : "chapters"), \(draft.scenes.count) \(draft.scenes.count == 1 ? "scene" : "scenes")"
+            guard let url = await ProjectPanels.chooseNewProjectFolder(named: draft.title, message: "\(counts) read from \(source.lastPathComponent). The folder becomes the project.") else { return }
+            settle()
+            guard !isDirty else { return }
+            guard Self.isEmptyFolder(url) else {
+                statusLine = "\(url.lastPathComponent) has files in it; choose an empty folder"
+                return
+            }
+            let author = Signature(name: NSFullUserName(), email: "writer@localhost")
+            do {
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                _ = try ProjectStore.create(at: url, draft: draft, author: author)
+            } catch {
+                statusLine = "Import failed: \(error.localizedDescription)"
+                return
+            }
+            open(url)
+            statusLine = "Imported \(counts) into \(url.lastPathComponent)"
+        }
+    }
+
+    /// A project folder without its repository becomes one again, in place.
+    private func adopt(_ url: URL) {
+        settle()
+        guard !isDirty else { return }
+        let author = Signature(name: NSFullUserName(), email: "writer@localhost")
+        do {
+            _ = try ProjectStore.adopt(at: url, author: author)
+        } catch {
+            statusLine = "Could not take in \(url.lastPathComponent): \(error.localizedDescription)"
+            return
+        }
+        open(url)
+        statusLine = "Took in \(url.lastPathComponent) as a project"
     }
 
     func openSample() {
