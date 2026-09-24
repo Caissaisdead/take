@@ -41,12 +41,15 @@ enum Accent: String, CaseIterable, Identifiable {
         }
     }
 
-    var color: Color {
+    var color: Color { Color(nsColor: nsColor) }
+
+    /// The same colour for AppKit: the caret, the selection, Compare's links.
+    var nsColor: NSColor {
         let (light, dark) = pair
-        return Color(nsColor: NSColor(name: nil) { appearance in
+        return NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             return NSColor(hex: isDark ? dark : light)
-        })
+        }
     }
 }
 

@@ -15,7 +15,7 @@ enum DiffRenderer {
         return Int(link.lastPathComponent)
     }
 
-    static func render(_ diff: ProseDiff) -> NSAttributedString {
+    static func render(_ diff: ProseDiff, accent: Accent = .blue) -> NSAttributedString {
         let out = NSMutableAttributedString()
         for (index, segment) in diff.segments.enumerated() {
             if index > 0 { out.append(run("\n\n", color: .labelColor)) }
@@ -24,10 +24,10 @@ enum DiffRenderer {
                 out.append(run(paragraph, color: .secondaryLabelColor))
             case .removed(let paragraph):
                 out.append(run(paragraph, color: .systemRed, decoration: .strikethroughStyle))
-                out.append(pick("bring back", segment: index))
+                out.append(pick("bring back", segment: index, accent: accent))
             case .inserted(let paragraph):
                 out.append(run(paragraph, color: .systemGreen, decoration: .underlineStyle))
-                out.append(pick("drop", segment: index))
+                out.append(pick("drop", segment: index, accent: accent))
             case .changed(_, _, let words):
                 for word in words {
                     switch word {
@@ -39,17 +39,17 @@ enum DiffRenderer {
                         out.append(run(token, color: .systemGreen, decoration: .underlineStyle))
                     }
                 }
-                out.append(pick("take theirs", segment: index))
+                out.append(pick("take theirs", segment: index, accent: accent))
             }
         }
         return out
     }
 
     /// A small link after a paragraph: what taking the other side would do.
-    private static func pick(_ verb: String, segment: Int) -> NSAttributedString {
+    private static func pick(_ verb: String, segment: Int, accent: Accent) -> NSAttributedString {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-            .foregroundColor: NSColor.linkColor,
+            .foregroundColor: accent.nsColor,
             .link: URL(string: "\(pickScheme)://segment/\(segment)")!,
             .paragraphStyle: paragraphStyle,
         ]
