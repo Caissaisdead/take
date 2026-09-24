@@ -143,6 +143,17 @@ final class ProjectModel {
     func open(_ url: URL, seedingSample: Bool = false) {
         settle()
         guard !isDirty else { return }
+        // Three Takes holds the store it started on; let it finish or be
+        // stopped rather than write into a project that is no longer open.
+        guard !isWritingTakes else {
+            statusLine = "Three Takes is still writing; stop it before opening another project"
+            return
+        }
+        untangleTask?.cancel()
+        untangleTask = nil
+        untangling = nil
+        untangleError = nil
+        isUntangling = false
         let author = Signature(name: NSFullUserName(), email: "writer@localhost")
         let scoped = url.startAccessingSecurityScopedResource() ? url : nil
         do {
@@ -499,7 +510,8 @@ final class ProjectModel {
     }
 
     /// Removes the item and whatever it holds. A removed scene that was open
-    /// leaves the editor empty; its edits go with it.
+    /// leaves the editor empty once it is gone; its edits go with it. A
+    /// removal that fails leaves the editor as it was.
     func remove(_ item: BinderItem) {
         guard let store else { return }
         let title = title(of: item)
@@ -509,17 +521,17 @@ final class ProjectModel {
         case .chapter(let id): gone = Set(manuscript.chapter(id)?.scenes.map(\.id) ?? [])
         case .scene(let id): gone = [id]
         }
-        if let current = selection?.sceneID, gone.contains(current) {
-            idleSave?.cancel()
-            isDirty = false
-            selection = nil
-            setEditorText("", dirty: false)
-        }
         attempt("Remove") {
             switch item {
             case .part(let id): try store.remove(part: id)
             case .chapter(let id): try store.remove(chapter: id)
             case .scene(let id): try store.remove(scene: id)
+            }
+            if let current = selection?.sceneID, gone.contains(current) {
+                idleSave?.cancel()
+                isDirty = false
+                selection = nil
+                setEditorText("", dirty: false)
             }
             refresh()
             statusLine = "Removed \(title); it stays in history"
