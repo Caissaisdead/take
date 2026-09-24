@@ -135,9 +135,11 @@ final class ProjectModel {
 
     // MARK: - Projects
 
-    /// Opens the project at `url`, or makes one there when the folder has no
-    /// repository (the sample is seeded when asked). A failure leaves whatever
-    /// was open as it was.
+    /// Opens the project at `url`, or makes one there when the folder is empty
+    /// or missing (the sample is seeded when asked). A folder with files in it
+    /// and no repository is left alone: a project without its `.git`, or any
+    /// other folder, must not be written over. A failure leaves whatever was
+    /// open as it was.
     func open(_ url: URL, seedingSample: Bool = false) {
         settle()
         guard !isDirty else { return }
@@ -148,6 +150,11 @@ final class ProjectModel {
             if FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) {
                 opened = try ProjectStore.open(at: url, author: author)
             } else {
+                guard seedingSample || Self.isEmptyFolder(url) else {
+                    scoped?.stopAccessingSecurityScopedResource()
+                    statusLine = "\(url.lastPathComponent) has files in it and is not a Take project; choose an empty folder"
+                    return
+                }
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
                 opened = try ProjectStore.create(at: url, title: url.lastPathComponent, author: author)
                 if seedingSample {
@@ -210,6 +217,13 @@ final class ProjectModel {
                 Task { @MainActor in self.statusLine = "Terminal did not open: \(error.localizedDescription)" }
             }
         }
+    }
+
+    /// A folder that is not there yet counts as empty; the Finder's own
+    /// `.DS_Store` does not count as a file.
+    private static func isEmptyFolder(_ url: URL) -> Bool {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: url.path) else { return true }
+        return names.allSatisfy { $0 == ".DS_Store" }
     }
 
     private static let bookmarkKey = "LastProjectBookmark"
