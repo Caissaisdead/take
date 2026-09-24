@@ -52,6 +52,8 @@ struct TakeApp: App {
                 Button("Mark Milestone…") { model.naming = .milestone }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
                     .disabled(model.manuscript.scenes.isEmpty)
+                Button("Targets…") { model.showTargets = true }
+                    .disabled(model.manuscript.scenes.isEmpty)
                 Divider()
                 Button("Reveal in Finder") { model.revealInFinder() }
                 Button("Open in Terminal") { model.openInTerminal() }

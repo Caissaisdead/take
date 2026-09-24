@@ -46,6 +46,12 @@ struct BinderView: View {
                     }
                 }
             }
+            if !model.manuscript.scenes.isEmpty {
+                Section {
+                    TotalsRow()
+                        .selectionDisabled()
+                }
+            }
         }
         .listStyle(.sidebar)
         .confirmationDialog(removalTitle, isPresented: removingBinding, titleVisibility: .visible) {
@@ -132,7 +138,15 @@ private struct ChapterHeader: View {
     @Binding var removing: ProjectModel.BinderItem?
 
     var body: some View {
-        Text(chapter.title)
+        HStack {
+            Text(chapter.title)
+            Spacer(minLength: 6)
+            Text(model.words(in: chapter).formatted())
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .help("Words in the chapter, on main")
+        }
             .contextMenu {
                 Button("New Scene in Chapter…") { model.naming = .scene(chapter: chapter.id, after: nil) }
                 Button("Rename Chapter…") { model.naming = .rename(.chapter(chapter.id)) }
@@ -186,6 +200,36 @@ private struct SceneRow: View {
                 Divider()
                 Button("Remove Scene…", role: .destructive) { removing = .scene(scene.id) }
             }
+    }
+}
+
+/// The whole draft's words, against the target when there is one.
+private struct TotalsRow: View {
+    @Environment(ProjectModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("\(model.totalWords.formatted()) words")
+                    .monospacedDigit()
+                Spacer(minLength: 4)
+                if let target = model.manuscript.target {
+                    Text("of \(target.formatted())")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .font(.caption)
+            if let target = model.manuscript.target, target > 0 {
+                ProgressView(value: min(Double(model.totalWords) / Double(target), 1))
+                    .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 2)
+        .contextMenu {
+            Button("Targets…") { model.showTargets = true }
+        }
+        .help("Draft > Targets… sets the whole draft's target and the day's")
     }
 }
 

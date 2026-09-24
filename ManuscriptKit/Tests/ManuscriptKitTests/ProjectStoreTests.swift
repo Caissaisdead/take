@@ -412,6 +412,33 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func wordsAreCountedPerSceneAndAsTheDayBegan() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+            store.clock = { yesterday }
+            let one = try store.addScene(title: "One", toChapter: nil, text: "One two three.\n")
+            let two = try store.addScene(title: "Two", toChapter: nil, text: "Four five [[not six]].\n")
+            let atYesterday = try store.mainHead()
+            #expect(try store.wordCounts() == [one.id: 3, two.id: 2])
+
+            store.clock = { Date() }
+            try store.checkpoint(one.id, text: "One two three four five.\n")
+            #expect(try store.wordCounts() == [one.id: 5, two.id: 2])
+            #expect(try store.wordCounts(at: atYesterday) == [one.id: 3, two.id: 2])
+            #expect(try store.wordCountAtStart(of: Date()) == 5)
+            // Another commit today moves nothing about where the day began.
+            try store.checkpoint(two.id, text: "Four.\n")
+            #expect(try store.wordCountAtStart(of: Date()) == 5)
+            #expect(try store.wordCounts().values.reduce(0, +) == 6)
+
+            // A draft younger than the day has no start to count from.
+            let young = try ProjectStore.create(at: url.appendingPathComponent("young"), title: "New", author: jane)
+            _ = try young.addScene(title: "A", toChapter: nil, text: "Words.\n")
+            #expect(try young.wordCountAtStart(of: Date()) == nil)
+        }
+    }
+
     @Test func takesAreCreatedSavedAndReadBack() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
