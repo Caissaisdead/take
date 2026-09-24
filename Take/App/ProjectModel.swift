@@ -376,10 +376,12 @@ final class ProjectModel {
         }
     }
 
-    /// The stress text as an unsaved edit.
+    /// The stress text in the editor, for the bench alone. Not marked dirty,
+    /// so the idle save never commits it over the scene; only a save the
+    /// writer asks for does.
     func loadStress() {
-        setEditorText(Prose.editorForm(Self.stressText), dirty: true)
-        statusLine = "Stress text loaded, \(wordCount) words, unsaved"
+        setEditorText(Prose.editorForm(Self.stressText), dirty: false)
+        statusLine = "Stress text loaded, \(wordCount) words; Save would commit it"
     }
 
     func recordLoad(millis: Double) {

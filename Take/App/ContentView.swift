@@ -75,8 +75,10 @@ struct ContentView: View {
                     Button("Keep") { model.keep() }
                     Button("Discard") { confirmDiscard = true }
                 }
-                Button("Stress") { model.loadStress() }
-                    .help("Load the sample scene four times over, about 20k words, as an unsaved edit")
+                if ProjectModel.isBenchRequested {
+                    Button("Stress") { model.loadStress() }
+                        .help("Load the sample scene four times over, about 20k words; not saved unless you save")
+                }
                 Toggle("Compare", isOn: compareBinding)
                     .toggleStyle(.button)
                     .keyboardShortcut("d", modifiers: [.command, .shift])
@@ -190,7 +192,7 @@ private struct StatusBar: View {
             }
             Text("\(model.wordCount) words")
                 .monospacedDigit()
-            if let millis = model.lastLoadMillis {
+            if ProjectModel.isBenchRequested, let millis = model.lastLoadMillis {
                 Text(String(format: "load %.1f ms", millis))
                     .monospacedDigit()
             }
