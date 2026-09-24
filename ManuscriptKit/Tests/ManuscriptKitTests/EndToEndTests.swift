@@ -88,7 +88,7 @@ import Testing
             let history = try store.history(of: scene.id)
             #expect(history.map(\.kind) == [.keep, .checkpoint, .checkpoint])
             #expect(history.map(\.id) == [merge, checkpoint, try store.repository.commit(checkpoint).parents[0]])
-            #expect(history[0].message == "Keep: take-2 - A Truth Universally Acknowledged")
+            #expect(history[0].message == "Keep: Take 2 - A Truth Universally Acknowledged")
             #expect(!ProseDiffer.diff(old: try store.sceneText(scene.id), new: secondEdit).hasChanges)
 
             // A second take, then main moves on the same scene: keep must refuse.

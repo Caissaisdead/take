@@ -138,7 +138,7 @@ final class ProjectModel {
     var selectionLabel: String {
         switch selection {
         case .main: return "Main"
-        case .take(let take): return "Take: \(take.title)"
+        case .take(let take): return "Take: \(take.name)"
         case nil: return "No scene"
         }
     }
@@ -192,7 +192,7 @@ final class ProjectModel {
             case .take(let take):
                 let saved = try store.saveTake(take, text: text)
                 self.selection = .take(saved)
-                statusLine = saved.head == take.head ? "Nothing changed on \(take.title)" : "Saved \(take.title) at \(saved.head.short)"
+                statusLine = saved.head == take.head ? "Nothing changed on \(take.name)" : "Saved \(take.name) at \(saved.head.short)"
             }
             // Same token, so the editor keeps its caret; only the fallback moves.
             editorText = text
@@ -459,7 +459,7 @@ final class ProjectModel {
         return MapNode(
             id: take.id,
             kind: discarded ? .discarded(take) : .take(take),
-            title: take.title,
+            title: take.name,
             words: Prose.wordCount(text),
             delta: (summary.wordsAdded, summary.wordsRemoved),
             saves: saves)
@@ -473,7 +473,7 @@ final class ProjectModel {
         case .take(let take):
             select(.take(take))
         case .discarded(let take):
-            statusLine = "\(take.title) was discarded; its ref is \(take.id)"
+            statusLine = "\(take.name) was discarded; its ref is \(take.id)"
         }
     }
 
@@ -578,7 +578,7 @@ final class ProjectModel {
         }
         attempt("New take") {
             let take = try store.createTake(for: scene, name: name)
-            statusLine = "Started \(take.title) from \(take.base.short)"
+            statusLine = "Started \(take.name) from \(take.base.short)"
             select(.take(take))
         }
     }
@@ -594,11 +594,11 @@ final class ProjectModel {
         attempt("Keep") {
             switch try store.keep(take) {
             case .kept(let merge):
-                statusLine = "Kept \(take.title) as \(merge.short)"
+                statusLine = "Kept \(take.name) as \(merge.short)"
                 select(.main(take.scene))
             case .conflict(let base, let main, let mine):
                 conflict = Conflict(base: base, main: main, take: mine)
-                statusLine = "Main changed since \(take.title) began; nothing written"
+                statusLine = "Main changed since \(take.name) began; nothing written"
             }
         }
     }
@@ -609,7 +609,7 @@ final class ProjectModel {
         isDirty = false
         attempt("Discard") {
             try store.discard(take)
-            statusLine = "Discarded \(take.title)"
+            statusLine = "Discarded \(take.name)"
             select(.main(take.scene))
         }
     }
@@ -764,13 +764,6 @@ final class ProjectModel {
     """
 }
 
-extension Take {
-    /// The slug read as a title: `take-2` shows as "Take 2".
-    var title: String {
-        let words = name.replacingOccurrences(of: "-", with: " ")
-        return words.prefix(1).uppercased() + words.dropFirst()
-    }
-}
 
 extension SceneID {
     /// The scene behind a `main:` map node id.

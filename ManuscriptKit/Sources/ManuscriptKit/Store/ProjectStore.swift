@@ -282,16 +282,25 @@ public final class ProjectStore {
 
     // MARK: - Takes
 
-    /// Branches the scene from main's head under `refs/takes/<scene>/<slug>`. The
-    /// take comes back named by its slug, as `takes(for:)` will list it.
+    /// Branches the scene from main's head under `refs/takes/<scene>/<name>`.
+    /// The ref carries the name itself, percent-encoded where git forbids a
+    /// character, so a take reads back exactly as it was named. A name already
+    /// in use (in any case) gets a number.
     public func createTake(for scene: SceneID, name: String) throws -> Take {
         _ = try sceneRef(scene)
         let head = try mainHead()
         let prefix = takesPrefix(for: scene)
-        let taken = Set(try repository.refs(withPrefix: prefix))
-        let ref = Self.unique(prefix + Self.slug(name, fallback: "take")) { taken.contains($0) }
-        try repository.updateRef(ref, to: head, message: "Take: \(name)")
-        return Take(id: ref, scene: scene, name: String(ref.dropFirst(prefix.count)), base: head, head: head)
+        let taken = Set(try repository.refs(withPrefix: prefix).map { $0.lowercased() })
+        let given = Self.takeName(name)
+        var candidate = given
+        var suffix = 2
+        while taken.contains((prefix + Self.refComponent(candidate)).lowercased()) {
+            candidate = "\(given) \(suffix)"
+            suffix += 1
+        }
+        let ref = prefix + Self.refComponent(candidate)
+        try repository.updateRef(ref, to: head, message: "Take: \(candidate)")
+        return Take(id: ref, scene: scene, name: candidate, base: head, head: head)
     }
 
     public func takes(for scene: SceneID) throws -> [Take] {
@@ -301,7 +310,7 @@ public final class ProjectStore {
         for ref in try repository.refs(withPrefix: prefix) {
             guard let takeHead = try repository.resolve(ref) else { continue }
             let base = try repository.mergeBase(head, takeHead) ?? takeHead
-            takes.append(Take(id: ref, scene: scene, name: String(ref.dropFirst(prefix.count)), base: base, head: takeHead))
+            takes.append(Take(id: ref, scene: scene, name: Self.takeName(fromRef: ref, prefix: prefix), base: base, head: takeHead))
         }
         return takes
     }
@@ -315,7 +324,7 @@ public final class ProjectStore {
         for ref in try repository.refs(withPrefix: prefix) {
             guard let takeHead = try repository.resolve(ref) else { continue }
             let base = try repository.mergeBase(head, takeHead) ?? takeHead
-            takes.append(Take(id: ref, scene: scene, name: String(ref.dropFirst(prefix.count)), base: base, head: takeHead))
+            takes.append(Take(id: ref, scene: scene, name: Self.takeName(fromRef: ref, prefix: prefix), base: base, head: takeHead))
         }
         return takes
     }
@@ -375,12 +384,21 @@ public final class ProjectStore {
 
     /// Moves the take's ref under `refs/discarded/`, so it can be brought back.
     public func discard(_ take: Take) throws {
-        let slug = take.id.split(separator: "/").last.map(String.init) ?? "take"
         let prefix = Self.discardedPrefix + take.scene.uuid.uuidString.lowercased() + "/"
-        let taken = Set(try repository.refs(withPrefix: prefix))
-        // A take discarded twice under one name must not overwrite the first.
-        let target = Self.unique(prefix + slug) { taken.contains($0) }
-        try repository.renameRef(take.id, to: target)
+        try repository.renameRef(take.id, to: try freeRef(named: take.name, under: prefix))
+    }
+
+    /// A ref under `prefix` for `name`, numbered past any already there. A take
+    /// discarded twice under one name must not overwrite the first.
+    private func freeRef(named name: String, under prefix: String) throws -> String {
+        let taken = Set(try repository.refs(withPrefix: prefix).map { $0.lowercased() })
+        var candidate = name
+        var suffix = 2
+        while taken.contains((prefix + Self.refComponent(candidate)).lowercased()) {
+            candidate = "\(name) \(suffix)"
+            suffix += 1
+        }
+        return prefix + Self.refComponent(candidate)
     }
 
     // MARK: - Plumbing
@@ -501,6 +519,35 @@ public final class ProjectStore {
 
     private static func number(_ n: Int) -> String {
         n < 10 ? "0\(n)" : "\(n)"
+    }
+
+    /// A take's name as given, trimmed; an empty name is "Take".
+    static func takeName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Take" : trimmed
+    }
+
+    static func takeName(fromRef ref: String, prefix: String) -> String {
+        let component = String(ref.dropFirst(prefix.count))
+        return component.removingPercentEncoding ?? component
+    }
+
+    /// The name as one component of a ref: letters, digits, hyphens and
+    /// underscores as they are, every other character as its UTF-8 bytes in
+    /// percent form. That covers everything git refuses (spaces, dots at the
+    /// ends, `..`, `@{`, `~^:?*[\` and controls) and stays reversible.
+    static func refComponent(_ name: String) -> String {
+        var out = ""
+        for scalar in name.unicodeScalars {
+            if scalar.properties.isAlphabetic || scalar.properties.numericType != nil || scalar == "-" || scalar == "_" {
+                out.unicodeScalars.append(scalar)
+            } else {
+                for byte in String(scalar).utf8 {
+                    out += String(format: "%%%02X", byte)
+                }
+            }
+        }
+        return out.isEmpty ? "Take" : out
     }
 
     /// Lowercase ASCII words joined by hyphens; anything else is stripped.

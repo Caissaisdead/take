@@ -15,7 +15,7 @@ struct VersionsView: View {
                     Label("Main", systemImage: "doc.text")
                         .tag(TakeRow.main)
                     ForEach(model.takes) { take in
-                        Label(take.title, systemImage: "arrow.triangle.branch")
+                        Label(take.name, systemImage: "arrow.triangle.branch")
                             .tag(TakeRow.take(take))
                     }
                     if model.takes.isEmpty {

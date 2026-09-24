@@ -311,7 +311,7 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             let history = try store.history(of: scene.id)
             #expect(history.map(\.id) == [merge, second, first, added])
             #expect(history.map(\.kind) == [.keep, .checkpoint, .checkpoint, .checkpoint])
-            #expect(history.map(\.message) == ["Keep: bolder - Opening", "Checkpoint: Opening", "Checkpoint: Opening", "Add Opening"])
+            #expect(history.map(\.message) == ["Keep: Bolder - Opening", "Checkpoint: Opening", "Checkpoint: Opening", "Add Opening"])
             #expect(abs(history[0].date.timeIntervalSinceNow) < 60)
             #expect(try store.history(of: scene.id, limit: 2).map(\.id) == [merge, second])
             #expect(try store.history(of: other.id).map(\.message) == ["Checkpoint: Other", "Add Other"])
@@ -326,17 +326,17 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             let uuid = scene.id.uuid.uuidString.lowercased()
 
             let take = try store.createTake(for: scene.id, name: "Darker Opening")
-            #expect(take.id == "refs/takes/\(uuid)/darker-opening")
+            #expect(take.id == "refs/takes/\(uuid)/Darker%20Opening")
             #expect(take.scene == scene.id)
-            #expect(take.name == "darker-opening")
+            #expect(take.name == "Darker Opening")
             #expect(take.base == head)
             #expect(take.head == head)
             #expect(try store.repository.resolve(take.id) == head)
             #expect(try store.takeText(take) == opening)
 
             let duplicate = try store.createTake(for: scene.id, name: "darker opening")
-            #expect(duplicate.id == "refs/takes/\(uuid)/darker-opening-2")
-            #expect(duplicate.name == "darker-opening-2")
+            #expect(duplicate.id == "refs/takes/\(uuid)/darker%20opening%202")
+            #expect(duplicate.name == "darker opening 2")
 
             #expect(try store.saveTake(take, text: opening) == take)
             let darker = "It is a truth universally denied.\n"
@@ -353,10 +353,30 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
 
             let listed = try store.takes(for: scene.id)
             #expect(listed.map(\.id) == [take.id, duplicate.id])
-            #expect(listed.map(\.name) == ["darker-opening", "darker-opening-2"])
+            #expect(listed.map(\.name) == ["Darker Opening", "darker opening 2"])
             #expect(listed.map(\.base) == [head, head])
             #expect(listed.map(\.head) == [saved.head, head])
             #expect(try store.takes(for: SceneID()).isEmpty)
+        }
+    }
+
+    @Test func takeNamesSurviveTheRefAndItsRules() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let scene = try store.addScene(title: "Opening", toChapter: nil, text: "Base.\n")
+            let uuid = scene.id.uuid.uuidString.lowercased()
+            let names = ["Mr. Bennet's reply…", "..", "a/b:c?d*e[f\\g^h~i", "@{ref}", " Ends with dot.", "  ", "Ünïcode naïveté", "take.lock"]
+            var made: [Take] = []
+            for name in names { made.append(try store.createTake(for: scene.id, name: name)) }
+            #expect(made.map(\.name) == ["Mr. Bennet's reply…", "..", "a/b:c?d*e[f\\g^h~i", "@{ref}", "Ends with dot.", "Take", "Ünïcode naïveté", "take.lock"])
+            #expect(made[0].id == "refs/takes/\(uuid)/Mr%2E%20Bennet%27s%20reply%E2%80%A6")
+            #expect(made[6].id == "refs/takes/\(uuid)/Ünïcode%20naïveté")
+            #expect(Set(try store.takes(for: scene.id).map(\.name)) == Set(made.map(\.name)))
+            // System git can list and read every one of them.
+            #expect(try git("for-each-ref", "--count=100", "--format=%(refname)", "refs/takes/", in: url).split(separator: "\n").count == names.count)
+            #expect(try git("rev-parse", "refs/takes/\(uuid)/Ünïcode%20naïveté", in: url).trimmingCharacters(in: .whitespacesAndNewlines) == made[6].head.hex)
+            #expect(ProjectStore.refComponent("") == "Take")
+            #expect(ProjectStore.takeName(fromRef: "refs/takes/x/Take%202", prefix: "refs/takes/x/") == "Take 2")
         }
     }
 
@@ -377,7 +397,7 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try store.mainHead() == merge)
             let info = try store.repository.commit(merge)
             #expect(info.parents == [unrelated, saved.head])
-            #expect(info.message == "Keep: bolder - Opening")
+            #expect(info.message == "Keep: Bolder - Opening")
             #expect(try store.sceneText(scene.id) == bolder)
             #expect(try store.sceneText(other.id) == "Elsewhere, later.\n")
             #expect(try Data(contentsOf: url.appendingPathComponent(scene.path)) == Data(bolder.utf8))
@@ -447,15 +467,15 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             try store.discard(take)
             #expect(try store.repository.resolve(take.id) == nil)
             #expect(try store.takes(for: scene.id).isEmpty)
-            #expect(try store.repository.resolve("refs/discarded/\(uuid)/alt") == take.head)
+            #expect(try store.repository.resolve("refs/discarded/\(uuid)/Alt") == take.head)
 
             let second = try store.saveTake(try store.createTake(for: scene.id, name: "Alt"), text: "Alt again.\n")
             try store.discard(second)
-            #expect(try store.repository.resolve("refs/discarded/\(uuid)/alt") == take.head)
-            #expect(try store.repository.resolve("refs/discarded/\(uuid)/alt-2") == second.head)
+            #expect(try store.repository.resolve("refs/discarded/\(uuid)/Alt") == take.head)
+            #expect(try store.repository.resolve("refs/discarded/\(uuid)/Alt%202") == second.head)
 
             let discarded = try store.discardedTakes(for: scene.id)
-            #expect(discarded.map(\.name) == ["alt", "alt-2"])
+            #expect(discarded.map(\.name) == ["Alt", "Alt 2"])
             #expect(discarded.map(\.head) == [take.head, second.head])
             #expect(discarded.map(\.base) == [take.base, second.base])
             #expect(try store.takeText(discarded[1]) == "Alt again.\n")
@@ -478,8 +498,8 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try git("status", "--porcelain", in: url) == "")
 
             let graph = try git("log", "--oneline", "--graph", in: url)
-            #expect(graph.hasPrefix("*   \(merge.short) Keep: plainer - Opening\n|\\"), "\(graph)")
-            #expect(graph.contains("Take: plainer - Opening"))
+            #expect(graph.hasPrefix("*   \(merge.short) Keep: Plainer - Opening\n|\\"), "\(graph)")
+            #expect(graph.contains("Take: Plainer - Opening"))
             #expect(graph.contains("Checkpoint: Opening"))
             #expect(graph.contains("Begin Pride and Prejudice"))
             #expect(try git("log", "--format=%an <%ae>", "-1", in: url) == "Jane Austen <jane@example.com>\n")
