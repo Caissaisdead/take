@@ -28,7 +28,9 @@ struct ContentView: View {
 
     @Environment(ProjectModel.self) private var model
     @State private var showInspector = true
-    @State private var showMap = false
+    /// What the detail column shows: the editor, the chapter map, or the draft since a milestone.
+    enum Detail { case editor, map, since }
+    @State private var detail: Detail = .editor
     @State private var inspectorTab: InspectorTab = .versions
     @State private var compareDiff: ProseDiff?
     @State private var compareRefresh: Task<Void, Never>?
@@ -40,10 +42,18 @@ struct ContentView: View {
             BinderView()
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
-            if showMap {
-                MapView()
-            } else {
+            switch detail {
+            case .editor:
                 DetailView()
+            case .map:
+                MapView()
+            case .since:
+                ChangesView { scene, milestone in
+                    model.open(scene, against: milestone)
+                    detail = .editor
+                    inspectorTab = .compare
+                    showInspector = true
+                }
             }
         }
         .inspector(isPresented: $showInspector) {
@@ -107,10 +117,15 @@ struct ContentView: View {
                     .toggleStyle(.button)
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                     .help("Compare the editor with another version (⇧⌘D)")
-                Toggle("Map", systemImage: "map", isOn: $showMap)
+                Toggle("Map", systemImage: "map", isOn: detailBinding(.map))
                     .toggleStyle(.button)
                     .keyboardShortcut("m", modifiers: [.command, .option])
                     .help("Map the chapter: scenes in a line, takes beneath (⌥⌘M)")
+                Toggle("Since", systemImage: "clock.arrow.circlepath", isOn: detailBinding(.since))
+                    .toggleStyle(.button)
+                    .keyboardShortcut("s", modifiers: [.command, .option])
+                    .help("Every scene against a milestone: what came and what went (⌥⌘S)")
+                    .disabled(model.manuscript.scenes.isEmpty)
                 Toggle("Inspector", systemImage: "sidebar.right", isOn: $showInspector)
                     .toggleStyle(.button)
             }
@@ -176,6 +191,14 @@ struct ContentView: View {
 
     private var comparing: Bool {
         showInspector && inspectorTab == .compare
+    }
+
+    /// A toolbar toggle for one detail mode; off means the editor.
+    private func detailBinding(_ mode: Detail) -> Binding<Bool> {
+        Binding(
+            get: { detail == mode },
+            set: { on in detail = on ? mode : .editor }
+        )
     }
 
     /// The Compare button: on opens the inspector on the compare tab, off goes

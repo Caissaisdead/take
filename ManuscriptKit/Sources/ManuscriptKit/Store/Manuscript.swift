@@ -283,6 +283,28 @@ public struct RemovedScene: Hashable, Sendable, Identifiable {
     }
 }
 
+/// How one scene stands against an earlier state of the draft.
+public struct SceneChange: Hashable, Sendable, Identifiable {
+    public enum Kind: Sendable { case added, removed, changed, same }
+
+    public var scene: SceneRef
+    /// The chapter it is in now, or was in for a removed scene.
+    public var chapter: UUID
+    public var kind: Kind
+    public var wordsAdded: Int
+    public var wordsRemoved: Int
+
+    public var id: SceneID { scene.id }
+
+    public init(scene: SceneRef, chapter: UUID, kind: Kind, wordsAdded: Int, wordsRemoved: Int) {
+        self.scene = scene
+        self.chapter = chapter
+        self.kind = kind
+        self.wordsAdded = wordsAdded
+        self.wordsRemoved = wordsRemoved
+    }
+}
+
 /// A named state of the whole draft: an annotated tag on a main commit under
 /// `refs/tags/milestones/<slug>`. Nothing in the draft changes when one is
 /// marked; the scene that did not move still has this as a version to compare
