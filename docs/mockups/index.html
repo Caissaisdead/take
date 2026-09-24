@@ -1,0 +1,638 @@
+<title>Take Screens</title>
+<style>
+:root{
+  --bg:#EEF0F3;--surface:#FFFFFF;--surface-2:#F6F7F9;--line:#D9DCE1;--text:#1B1D21;--text-2:#6B7079;--text-3:#A2A7AF;
+  --accent:#2F5FD0;--accent-tint:rgba(47,95,208,.08);--red:#C2262E;--green:#2E8B4A;--orange:#E08A00;
+  --chrome:#E4E6EA;--chrome-line:#CBCED4;--sel:#DCE5F9;--shadow:0 20px 60px rgba(20,24,35,.18);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--bg:#131417;--surface:#1E1F24;--surface-2:#26272D;--line:#33353C;--text:#ECEDF0;--text-2:#9EA3AD;--text-3:#6B707A;
+  --accent:#6E93F0;--accent-tint:rgba(110,147,240,.14);--red:#F0666D;--green:#5FC27A;--orange:#F0A63A;
+  --chrome:#2A2B31;--chrome-line:#3B3D45;--sel:#2C3C66;--shadow:0 20px 60px rgba(0,0,0,.5);}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#131417;--surface:#1E1F24;--surface-2:#26272D;--line:#33353C;--text:#ECEDF0;--text-2:#9EA3AD;--text-3:#6B707A;
+  --accent:#6E93F0;--accent-tint:rgba(110,147,240,.14);--red:#F0666D;--green:#5FC27A;--orange:#F0A63A;
+  --chrome:#2A2B31;--chrome-line:#3B3D45;--sel:#2C3C66;--shadow:0 20px 60px rgba(0,0,0,.5);}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;padding-inline:16px;padding-block:28px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:18px}
+h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em;text-wrap:balance}
+.lede{margin:0;color:var(--text-2);max-width:62ch}
+.seg{display:inline-flex;background:var(--chrome);border:1px solid var(--chrome-line);border-radius:9px;padding:2px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--text-2);font:inherit;font-weight:560;padding:5px 14px;border-radius:7px;cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible,.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{border:1px solid var(--line);background:var(--surface);color:var(--text-2);font:inherit;font-size:13px;padding:4px 11px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.note{font-size:13px;color:var(--text-2);margin:0}
+.stage{display:grid;gap:10px}
+.caption{font-size:13px;color:var(--text-2);margin:0;max-width:70ch}
+[hidden]{display:none!important}
+
+/* device frames scale to the column */
+.frame{position:relative;width:100%;overflow:hidden}
+.frame>.scale{position:absolute;left:0;top:0;transform-origin:0 0}
+.mac-frame{aspect-ratio:1100/720;max-width:1100px}
+.phone-frame{aspect-ratio:393/852;max-width:393px;margin:0 auto}
+
+/* ---------- Mac ---------- */
+.win{width:1100px;height:720px;background:var(--surface);border-radius:11px;box-shadow:var(--shadow);border:1px solid var(--chrome-line);display:grid;grid-template-rows:52px 1fr;font-size:13px;overflow:hidden}
+.titlebar{background:var(--chrome);border-bottom:1px solid var(--chrome-line);display:grid;grid-template-columns:230px 1fr;align-items:center}
+.lights{display:flex;gap:8px;padding-left:12px}.lights i{width:12px;height:12px;border-radius:50%;background:#D0D3D8;display:block}
+.lights i:nth-child(1){background:#FF5F57}.lights i:nth-child(2){background:#FEBC2E}.lights i:nth-child(3){background:#28C840}
+.tb{display:flex;align-items:center;gap:6px;padding:0 12px 0 8px}
+.tb .title{margin-right:auto;font-weight:600}.tb .title small{display:block;font-weight:400;color:var(--text-2);font-size:11px}
+.tb .grp{display:flex;gap:4px;padding:0 6px;border-left:1px solid var(--chrome-line)}
+.tb button{border:0;background:transparent;color:var(--text);font:inherit;font-size:12px;padding:4px 8px;border-radius:6px;display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.tb button.on{background:var(--sel)}.tb button:hover{background:rgba(0,0,0,.06)}
+.cols{display:grid;grid-template-columns:240px 1fr 300px;min-height:0}
+.cols.wide-insp{grid-template-columns:240px 1fr 440px}
+.binder{background:var(--surface-2);border-right:1px solid var(--line);overflow:hidden;padding:8px 0}
+.binder .part{padding:10px 14px 4px;font-weight:650;font-size:13px}
+.binder .ch{display:flex;justify-content:space-between;padding:8px 14px 3px;color:var(--text-2);font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em}
+.binder .ch b{font-variant-numeric:tabular-nums;font-weight:500}
+.row{display:flex;gap:8px;align-items:flex-start;padding:5px 14px;cursor:pointer;border-radius:6px;margin:0 6px}
+.row .ic{color:var(--text-2);width:14px;padding-top:2px}
+.row .t{display:grid}.row .t small{color:var(--text-2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.row.sel{background:var(--sel)}
+.binder .foot{margin:12px 14px 6px;border-top:1px solid var(--line);padding-top:8px;font-size:11px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.meter{height:3px;background:var(--line);border-radius:2px;margin-top:6px}.meter i{display:block;height:100%;width:62%;background:var(--accent);border-radius:2px}
+.removed .row .t{color:var(--text-2)}.removed .row button{margin-left:auto;border:0;background:none;color:var(--accent);font:inherit;font-size:11px;cursor:pointer}
+.page{display:grid;grid-template-rows:1fr 30px;min-height:0}
+.prose{padding:24px 32px;overflow:hidden;min-height:0;font:17px/1.5 ui-serif,"New York","Iowan Old Style",Georgia,serif}
+.prose p{margin:0 0 14px}.prose .dim{color:var(--text-3)}.prose .note{color:var(--text-3);font-style:italic}.prose .brk{text-align:center;color:var(--text-3)}
+.prose .cursor{border-left:2px solid var(--accent);margin-left:1px}
+.status{border-top:1px solid var(--line);background:var(--surface-2);display:flex;gap:12px;align-items:center;padding:0 12px;font-size:11px;color:var(--text)}
+.status .dot{width:7px;height:7px;border-radius:50%;background:var(--orange)}.status .msg{margin-left:auto;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status .num{font-variant-numeric:tabular-nums}
+.insp{border-left:1px solid var(--line);display:grid;grid-template-rows:44px 1fr;min-height:0;background:var(--surface)}
+.insp .picker{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.insp .segi{display:flex;background:var(--chrome);border-radius:7px;padding:2px;gap:1px}
+.insp .segi span{width:38px;height:22px;display:grid;place-items:center;border-radius:5px;color:var(--text-2);font-size:12px}
+.insp .segi span.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.insp .picker small{color:var(--text-2);font-size:11px}
+.insp .body{overflow:hidden;padding:10px 12px;font-size:12px}
+.insp h4{margin:10px 0 4px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);font-weight:650}
+.vrow{display:flex;gap:8px;align-items:center;padding:5px 4px}.vrow .ic{color:var(--text-2);width:14px}.vrow .t{display:grid}.vrow .t small{color:var(--text-2);font-size:11px}
+.vrow button{margin-left:auto;border:0;background:none;color:var(--accent);font:inherit;font-size:11px;cursor:pointer}
+.vrow.sel{background:var(--sel);border-radius:5px}
+.diff{font:14px/1.5 ui-serif,"New York",Georgia,serif;padding:6px 4px}
+.diff p{margin:0 0 12px;color:var(--text-2)}.diff p.ch{color:var(--text)}
+.del{color:var(--red);text-decoration:line-through}.ins{color:var(--green);text-decoration:underline}
+.diff .lnk{font:11px -apple-system,system-ui,sans-serif;color:var(--accent);margin-left:8px;text-decoration:none}
+.sum{font-size:12px;color:var(--text-2);padding:4px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.sel-field{border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;background:var(--surface);margin-bottom:6px;display:flex;justify-content:space-between}
+/* map */
+.mapv{padding:14px 20px;overflow:hidden;position:relative;min-height:0}
+.mapv .hdr{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-2);margin-bottom:22px}
+.mapv .hdr .sel-field{margin:0;width:260px;color:var(--text)}
+.mcols{display:flex;gap:60px;position:relative}
+.mcol{width:210px;position:relative}
+.node{width:210px;height:84px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface);position:relative;font-size:12px}
+.node b{display:flex;gap:6px;align-items:center;font-size:13px}.node small{display:block;color:var(--text-2);margin-top:4px;line-height:1.35}
+.node.take{background:var(--accent-tint);margin:24px 0 0 28px}.node.take b{color:var(--accent)}
+.node.dis{opacity:.55;margin:24px 0 0 28px}
+.node.open{border:2px solid var(--accent)}
+.spine{position:absolute;left:12px;top:84px;width:1.5px;height:210px;background:var(--line)}
+.stub{position:absolute;left:12px;width:16px;height:1.5px;background:var(--accent)}
+.stub.d{background:var(--line);border-top:1.5px dashed var(--text-3);height:0}
+.arrow{position:absolute;top:41px;left:210px;width:60px;height:2px;background:var(--text-3)}
+.arrow::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:8px solid var(--text-3)}
+/* since */
+.since{padding:0;overflow:hidden;min-height:0}
+.since .hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--text-2)}
+.since .hdr .sel-field{margin:0;width:300px;color:var(--text)}
+.since h5{margin:14px 16px 4px;font-size:11px;color:var(--text-2);font-weight:650;text-transform:uppercase;letter-spacing:.05em}
+.srow{display:grid;grid-template-columns:20px 1fr 120px 160px;gap:12px;align-items:center;padding:6px 16px;font-size:13px}
+.srow .c{font-size:11px;color:var(--text-2);text-align:right;font-variant-numeric:tabular-nums}
+.bar2{height:6px;border-radius:3px;background:var(--line);position:relative}
+.bar2 i{position:absolute;top:0;height:100%}.bar2 .r{right:50%;background:var(--red);opacity:.75}.bar2 .g{left:50%;background:var(--green);opacity:.75}
+.ic-plus{color:var(--green)}.ic-minus{color:var(--red)}.ic-pen{color:var(--accent)}.ic-same{color:var(--text-3)}
+
+/* ---------- iPhone ---------- */
+.phone{width:393px;height:852px;background:var(--surface);border-radius:48px;border:10px solid #111;box-shadow:var(--shadow);overflow:hidden;position:relative;font-size:15px}
+.island{position:absolute;left:50%;top:10px;transform:translateX(-50%);width:120px;height:34px;border-radius:20px;background:#111;z-index:5}
+.statusbar{height:56px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 32px 6px;font-size:14px;font-weight:600}
+.nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:6px 8px 8px;min-height:44px}
+.nav .l{color:var(--accent);display:flex;gap:2px;align-items:center;cursor:pointer;white-space:nowrap}.nav .r{display:flex;justify-content:flex-end;gap:14px;color:var(--accent)}
+.nav .c{text-align:center;max-width:230px;margin:0 auto}.nav .c b{display:block;font-size:16px}.nav .c small{display:block;font-size:12px;color:var(--text-2)}
+.nav .c small .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--orange);margin-left:6px;vertical-align:middle}
+.large{padding:2px 20px 8px;font-size:30px;font-weight:700;letter-spacing:-.02em}
+.large small{display:block;font-size:13px;font-weight:400;color:var(--text-2);margin-top:2px}
+.list{padding:0 16px;display:grid;gap:8px;overflow:hidden}
+.list .sec{background:var(--surface-2);border-radius:12px;overflow:hidden}
+.list .sh{display:flex;justify-content:space-between;padding:8px 16px 2px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);font-weight:600}
+.list .sh b{font-weight:500;font-variant-numeric:tabular-nums}
+.prow{display:flex;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--line);cursor:pointer}
+.prow:first-of-type{border-top:0}.prow .ic{color:var(--accent);width:18px}.prow .t{display:grid;flex:1;min-width:0}
+.prow .t span{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prow .t small{color:var(--text-2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .n{color:var(--text-2);font-size:13px;font-variant-numeric:tabular-nums}.prow .chev{color:var(--text-3)}
+.prow.sel{background:var(--sel)}
+.prow button{border:0;background:none;color:var(--accent);font:inherit;font-size:14px;cursor:pointer}
+.pfoot{padding:12px 20px;font-size:13px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.pprose{padding:6px 20px 0;overflow:hidden;font:18px/1.45 ui-serif,"New York","Iowan Old Style",Georgia,serif;height:520px}
+.pprose p{margin:0 0 13px}.pprose .dim{color:var(--text-3)}.pprose .note{color:var(--text-3);font-style:italic}
+.pprose .cursor{border-left:2px solid var(--accent)}
+.kbar{position:absolute;left:0;right:0;bottom:0;background:var(--chrome);border-top:1px solid var(--chrome-line)}
+.kbar .takebar{display:flex;gap:10px;padding:8px 16px;border-bottom:1px solid var(--chrome-line);background:var(--surface-2)}
+.kbar .takebar button{flex:1;border:0;border-radius:8px;padding:8px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.kbar .takebar button.q{background:var(--surface);color:var(--red);border:1px solid var(--line)}
+.kbar .acc{display:flex;gap:6px;padding:8px 10px;align-items:center}
+.kbar .acc span{flex:1;text-align:center;background:var(--surface);border-radius:6px;padding:7px 0;font-size:14px;box-shadow:0 1px 1px rgba(0,0,0,.15)}
+.kbar .acc span.done{flex:1.3;background:transparent;box-shadow:none;color:var(--accent);font-weight:600}
+.keys{height:216px;background:var(--chrome);display:grid;place-items:center;color:var(--text-3);font-size:13px;padding-bottom:20px}
+.home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--text);opacity:.85;z-index:6}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.28);z-index:3}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface-2);border-radius:20px 20px 0 0;z-index:4;padding:8px 0 30px;box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.sheet .grab{width:36px;height:5px;border-radius:3px;background:var(--text-3);margin:0 auto 8px}
+.sheet .sh2{display:flex;justify-content:space-between;align-items:center;padding:4px 20px 10px;font-size:17px;font-weight:600}
+.sheet .sh2 span{color:var(--accent);font-weight:500;font-size:16px;cursor:pointer}
+.sheet .list{padding:0 16px}.sheet .list .sec{background:var(--surface)}
+.sheet.tall{height:640px}.sheet.mid{height:420px}
+.pdiff{padding:0 20px;font:16px/1.45 ui-serif,"New York",Georgia,serif;overflow:hidden}
+.pdiff p{margin:0 0 10px;color:var(--text-2)}.pdiff p.ch{color:var(--text)}
+.pdiff .btns{display:flex;gap:8px;margin:-4px 0 12px}.pdiff .btns span{font:13px -apple-system,system-ui,sans-serif;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface)}
+.field{margin:0 20px 10px;background:var(--surface);border-radius:10px;padding:10px 12px;font-size:16px;display:flex;justify-content:space-between;align-items:center;color:var(--text-2)}
+.field b{color:var(--text);font-weight:500}
+.field.focus{outline:2px solid var(--accent)}
+.hint{margin:0 20px 8px;font-size:13px;color:var(--text-2)}
+.pmap{padding:0 16px;display:grid;gap:10px;overflow:hidden}
+.pcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.pcard b{display:flex;gap:6px;align-items:center;font-size:16px}.pcard small{display:block;color:var(--text-2);margin-top:3px}
+.pcard.take{margin-left:24px;background:var(--accent-tint)}.pcard.take b{color:var(--accent)}
+.pcard.dis{margin-left:24px;opacity:.55;border-style:dashed}
+.prow2{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:10px 16px;border-top:1px solid var(--line)}
+.prow2:first-child{border-top:0}
+.prow2 .bar2{grid-column:2/4;height:5px;margin-top:-2px}
+.prow2 .c{font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.gap{height:8px}
+@media (prefers-reduced-motion:no-preference){.pane{animation:fade .18s ease-out}@keyframes fade{from{opacity:.6}to{opacity:1}}}
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Take on the Mac and the iPhone</h1>
+    <p class="lede">The key screens of both apps, drawn to the design in <code>docs/Design.md</code>. Pick a device, then a screen; the binder rows, the takes caption and the phone's sheets respond to a click. Type is the system's: SF for the interface, New York for the prose.</p>
+  </div>
+
+  <div class="bar">
+    <div class="seg" role="tablist" aria-label="Device">
+      <button role="tab" id="dev-mac" aria-selected="true" data-dev="mac">Mac</button>
+      <button role="tab" id="dev-phone" aria-selected="false" data-dev="phone">iPhone</button>
+    </div>
+    <div class="tabs" id="tabs-mac" role="tablist" aria-label="Mac screens">
+      <button role="tab" aria-selected="true" data-screen="mac-editor">Editor and inspector</button>
+      <button role="tab" aria-selected="false" data-screen="mac-compare">Compare</button>
+      <button role="tab" aria-selected="false" data-screen="mac-map">Map</button>
+      <button role="tab" aria-selected="false" data-screen="mac-since">Since</button>
+    </div>
+    <div class="tabs" id="tabs-phone" role="tablist" aria-label="iPhone screens" hidden>
+      <button role="tab" aria-selected="true" data-screen="ph-projects">Projects</button>
+      <button role="tab" aria-selected="false" data-screen="ph-binder">Binder</button>
+      <button role="tab" aria-selected="false" data-screen="ph-editor">Editor</button>
+      <button role="tab" aria-selected="false" data-screen="ph-takes">Takes</button>
+      <button role="tab" aria-selected="false" data-screen="ph-compare">Compare</button>
+      <button role="tab" aria-selected="false" data-screen="ph-find">Find</button>
+      <button role="tab" aria-selected="false" data-screen="ph-map">Map</button>
+      <button role="tab" aria-selected="false" data-screen="ph-since">Since</button>
+      <button role="tab" aria-selected="false" data-screen="ph-pull">Pull</button>
+    </div>
+  </div>
+
+  <!-- ================= MAC ================= -->
+  <div class="stage" id="stage-mac">
+    <div class="frame mac-frame"><div class="scale">
+      <div class="win">
+        <div class="titlebar">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <div class="tb">
+            <div class="title">Pride and Prejudice<small>~/Documents</small></div>
+            <div class="grp"><button>＋ New Scene</button><button>Save</button><button>⚑ Milestone</button></div>
+            <div class="grp" id="mac-takegrp"><button>New Take</button><button id="mac-keep" hidden>✓ Keep</button><button id="mac-discard" hidden>✕ Discard</button></div>
+            <div class="grp"><button id="mac-b-compare">⧉ Compare</button><button id="mac-b-map">⌘ Map</button><button id="mac-b-since">↻ Since</button><button class="on">▥ Inspector</button></div>
+          </div>
+        </div>
+        <div class="cols" id="mac-cols">
+          <!-- binder -->
+          <div class="binder">
+            <div class="part">Volume One</div>
+            <div class="ch"><span>Longbourn</span><b>7,812</b></div>
+            <div class="row sel" data-scene="truth"><span class="ic">▤</span><div class="t">A truth universally acknowledged<small>Bennet hears Netherfield is let</small></div></div>
+            <div class="row" data-scene="netherfield"><span class="ic">▤</span><div class="t">Netherfield<small>The carriage turns in at the gates</small></div></div>
+            <div class="row" data-scene="ball"><span class="ic">▤</span><div class="t">The assembly ball<small>Darcy will not dance</small></div></div>
+            <div class="ch"><span>Meryton</span><b>4,190</b></div>
+            <div class="row" data-scene="visit"><span class="ic">▤</span><div class="t">A visit returned<small>Mr. Bennet has called already</small></div></div>
+            <div class="row" data-scene="letter"><span class="ic">▤</span><div class="t">Jane's letter<small></small></div></div>
+            <div class="part">Volume Two</div>
+            <div class="ch"><span>Rosings</span><b>2,240</b></div>
+            <div class="row" data-scene="rosings"><span class="ic">▤</span><div class="t">Lady Catherine<small></small></div></div>
+            <div class="foot">14,242 words <span style="float:right">of 90,000</span><div class="meter"><i style="width:16%"></i></div></div>
+            <div class="ch removed" style="margin-top:6px"><span>Recently removed</span></div>
+            <div class="removed"><div class="row"><span class="ic">▤</span><div class="t">Mary at the piano<small>Longbourn · Sep 19</small></div><button>Restore</button></div></div>
+          </div>
+
+          <!-- page -->
+          <div class="page" id="mac-page">
+            <div class="prose pane" id="mac-prose">
+              <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+              <p>However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered the rightful property of some one or other of their daughters.</p>
+              <p>“My dear Mr. Bennet,” said his lady to him one day, “have you heard that Netherfield Park is let at last?” <span class="note">[[check: does Mrs. Long call on Tuesday or Monday?]]</span></p>
+              <p>Mr. Bennet replied that he had not.</p>
+              <p>“But it is,” returned she; “for Mrs. Long has just been here, and she told me all about it.”</p>
+              <p>Mr. Bennet made no answer.</p>
+              <p>“Do you not want to know who has taken it?” cried his wife <span class="dim">_</span>impatiently<span class="dim">_</span>.</p>
+              <p>“<span class="dim">*</span>You<span class="dim">*</span> want to tell me, and I have no objection to hearing it.”<span class="cursor"></span></p>
+              <p class="brk">* * *</p>
+              <p>This was invitation enough.</p>
+            </div>
+            <div class="mapv pane" id="mac-map" hidden>
+              <div class="hdr"><div class="sel-field">Longbourn <span>▾</span></div><span>3 scenes · 3 takes · click a node to open it</span></div>
+              <div class="mcols">
+                <div class="mcol">
+                  <div class="node open"><b>▤ A truth universally acknowledged</b><small>Bennet hears Netherfield is let · 2,318 words</small></div>
+                  <div class="arrow"></div><div class="spine"></div>
+                  <div class="stub" style="top:150px"></div><div class="node take"><b>⑂ Take 2</b><small>2,290 words · +41 −69 vs main · 3 saves</small></div>
+                  <div class="stub d" style="top:258px"></div><div class="node dis"><b>⑂ Colder opening</b><small>2,401 words · +190 −107 vs main · discarded</small></div>
+                </div>
+                <div class="mcol">
+                  <div class="node"><b>▤ Netherfield</b><small>The carriage turns in at the gates · 3,004 words</small></div>
+                  <div class="arrow"></div>
+                </div>
+                <div class="mcol">
+                  <div class="node"><b>▤ The assembly ball</b><small>Darcy will not dance · 2,490 words</small></div>
+                  <div class="spine" style="height:100px"></div>
+                  <div class="stub" style="top:150px"></div><div class="node take"><b>⑂ Take A: Late in, early out</b><small>2,102 words · +612 −1,000 vs main · 1 save</small></div>
+                </div>
+              </div>
+            </div>
+            <div class="since pane" id="mac-since" hidden>
+              <div class="hdr"><div class="sel-field">First draft · Sep 12 <span>▾</span></div><span>4 of 6 scenes moved · +1,940 −730 words</span></div>
+              <h5>Longbourn</h5>
+              <div class="srow"><span class="ic-pen">✎</span><span>A truth universally acknowledged</span><span class="c">+212 −88</span><div class="bar2"><i class="r" style="width:12%"></i><i class="g" style="width:28%"></i></div></div>
+              <div class="srow"><span class="ic-same">○</span><span>Netherfield</span><span class="c">unchanged</span><div class="bar2"></div></div>
+              <div class="srow"><span class="ic-pen">✎</span><span>The assembly ball</span><span class="c">+1,004 −402</span><div class="bar2"><i class="r" style="width:40%"></i><i class="g" style="width:50%"></i></div></div>
+              <h5>Meryton</h5>
+              <div class="srow"><span class="ic-plus">⊕</span><span>A visit returned</span><span class="c">new, 724 words</span><div class="bar2"><i class="g" style="width:36%"></i></div></div>
+              <div class="srow"><span class="ic-same">○</span><span>Jane's letter</span><span class="c">unchanged</span><div class="bar2"></div></div>
+              <h5>Gone since</h5>
+              <div class="srow"><span class="ic-minus">⊖</span><span style="color:var(--text-2)">Mary at the piano</span><span class="c">−240 words</span><div class="bar2"><i class="r" style="width:24%"></i></div></div>
+            </div>
+            <div class="status">
+              <b id="mac-which">Main</b><span class="dot" id="mac-dot"></span>
+              <span class="num">2,318 words</span><span class="num" style="color:var(--text-2)">today +812 of 1,000</span>
+              <span class="msg" id="mac-msg">Checkpoint 3f1c9a2</span>
+            </div>
+          </div>
+
+          <!-- inspector -->
+          <div class="insp">
+            <div class="picker">
+              <div class="segi" id="mac-segi"><span class="on" data-pane="versions" title="Versions">◷</span><span data-pane="compare" title="Compare">⧉</span><span data-pane="scene" title="Scene">✎</span><span data-pane="find" title="Find">⌕</span><span data-pane="untangle" title="Untangle">✦</span></div>
+              <small id="mac-pane-name">Versions</small>
+            </div>
+            <div class="body">
+              <div class="pane" id="mac-pane-versions">
+                <h4>Takes</h4>
+                <div class="vrow sel" data-take="main"><span class="ic">▤</span><div class="t">Main</div></div>
+                <div class="vrow" data-take="take2"><span class="ic">⑂</span><div class="t">Take 2<small>+41 −69 vs main · 3 saves</small></div></div>
+                <h4>Discarded</h4>
+                <div class="vrow"><span class="ic" style="opacity:.5">⑂</span><div class="t" style="color:var(--text-2)">Colder opening</div><button>Restore</button></div>
+                <h4>Milestones</h4>
+                <div class="vrow"><span class="ic">⚑</span><div class="t">First draft<small>Sep 12, 21:40</small></div><button>Restore</button></div>
+                <h4>History</h4>
+                <div class="vrow"><span class="ic">⇄</span><div class="t">Keep: Take 1 - A truth universally acknowledged<small>Sep 22, 10:04</small></div><button>Restore</button></div>
+                <div class="vrow"><span class="ic">●</span><div class="t">Checkpoint: A truth universally acknowledged<small>Sep 21, 23:12</small></div><button>Restore</button></div>
+                <div class="vrow"><span class="ic">●</span><div class="t">Checkpoint: A truth universally acknowledged<small>Sep 21, 22:58</small></div><button>Restore</button></div>
+                <div class="vrow"><span class="ic">●</span><div class="t">Add A truth universally acknowledged<small>Sep 10, 09:31</small></div><button>Restore</button></div>
+              </div>
+              <div class="pane" id="mac-pane-compare" hidden>
+                <div class="sel-field">Previous version <span>▾</span></div>
+                <div class="sum">2 paragraphs changed  +3 −2 words  ·  a paragraph's link takes the other side</div>
+                <div class="diff">
+                  <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+                  <p class="ch">Mr. Bennet <span class="del">made no answer.</span><span class="ins">made no answer at all.</span><a class="lnk" href="#compare">⟵ take theirs</a></p>
+                  <p>“Do you not want to know who has taken it?” cried his wife impatiently.</p>
+                  <p class="ch"><span class="ins">Not for a moment.</span><a class="lnk" href="#compare">⟵ drop</a></p>
+                  <p>“You want to tell me, and I have no objection to hearing it.”</p>
+                </div>
+              </div>
+              <div class="pane" id="mac-pane-scene" hidden>
+                <h4>Synopsis</h4><div class="sel-field" style="display:block;color:var(--text)">Bennet hears Netherfield is let</div>
+                <h4>Notes</h4><div class="sel-field" style="display:block;height:120px;color:var(--text);line-height:1.4">Keep Mrs. Bennet's speeches long and his short; the comedy is the ratio. Check the Meryton distance later.</div>
+                <div style="font-size:11px;color:var(--text-2)">Both go to Untangle and Three Takes with the scene, and never into the draft.</div>
+                <h4>In the text</h4>
+                <div class="vrow"><small style="color:var(--text-3);width:22px;text-align:right">¶3</small><div class="t">check: does Mrs. Long call on Tuesday or Monday?</div></div>
+              </div>
+              <div class="pane" id="mac-pane-find" hidden>
+                <div class="sel-field" style="color:var(--text)">Bingley</div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-2);padding:0 2px 8px"><span>☐ Takes too</span><span>4 in 3 places</span></div>
+                <h4>Longbourn</h4>
+                <div class="vrow"><div class="t"><small>A truth universally acknowledged · ¶12</small>…a young man of large fortune; that his name was <b>Bingley</b>, and he was to take possession…</div></div>
+                <div class="vrow"><div class="t"><small>Netherfield · ¶2</small>Mr. <b>Bingley</b> met them on the steps himself, which nobody had expected…</div></div>
+                <div class="vrow"><div class="t"><small>The assembly ball · ¶1</small>Mr. <b>Bingley</b> was good-looking and gentlemanlike; he had a pleasant countenance…</div></div>
+                <div class="vrow"><div class="t"><small>The assembly ball · ¶9</small>…between him and Mr. <b>Bingley</b> there was a great difference…</div></div>
+              </div>
+              <div class="pane" id="mac-pane-untangle" hidden>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><button style="border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 10px;font:inherit;font-size:12px">✦ Untangle Again</button></div>
+                <div style="font-size:11px;color:var(--text-2)">On this Mac, on Apple's model. Nothing is written into the draft.</div>
+                <h4>What the scene is for</h4><div>To set the marriage market as the book's engine, through the Bennets' first argument about it.</div>
+                <h4>The shift</h4><div>From Mr. Bennet's indifference to his private amusement.</div>
+                <h4>Beats</h4><div>1. News arrives via Mrs. Long<br>2. He withholds interest<br>3. She lays out the fortune<br>4. The daughters are counted<br>5. He teases; she misreads it<br>6. He agrees to call, and says nothing</div>
+                <h4>The reader must</h4><div>Know that he will visit, and that she will never know he meant to.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="caption" id="mac-caption">The layout the Mac has today. The toolbar sits in three groups: make, this take, views. Click a binder row to open it; click Take 2 in Versions to see Keep and Discard appear.</p>
+  </div>
+
+  <!-- ================= iPHONE ================= -->
+  <div class="stage" id="stage-phone" hidden>
+    <div class="frame phone-frame"><div class="scale">
+      <div class="phone">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span>●●● ⌾</span></div>
+
+        <!-- Projects -->
+        <div class="pane" id="ph-projects">
+          <div class="nav"><div class="l"></div><div class="c"></div><div class="r"><span>＋</span></div></div>
+          <div class="large">Projects<small>On this iPhone</small></div>
+          <div class="list">
+            <div class="sec">
+              <div class="prow" data-go="ph-binder"><span class="ic">📕</span><div class="t"><span>Pride and Prejudice</span><small>14,242 words · 6 scenes · pulled 12 min ago</small></div><span class="chev">›</span></div>
+              <div class="prow"><span class="ic">📗</span><div class="t"><span>The Lighthouse Year</span><small>61,008 words · 44 scenes · backed up yesterday</small></div><span class="chev">›</span></div>
+              <div class="prow"><span class="ic">📘</span><div class="t"><span>Sample Project</span><small>5,183 words · 2 scenes · on this iPhone only</small></div><span class="chev">›</span></div>
+            </div>
+            <div class="sh">Add a project</div>
+            <div class="sec">
+              <div class="prow"><span class="ic">☁︎↓</span><div class="t"><span>Pull from a remote</span><small>A URL and a token, as on the Mac</small></div><span class="chev">›</span></div>
+              <div class="prow"><span class="ic">▣</span><div class="t"><span>Open a folder</span><small>A project in iCloud Drive or Files, worked on in place</small></div><span class="chev">›</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Binder -->
+        <div class="pane" id="ph-binder" hidden>
+          <div class="nav"><div class="l" data-go="ph-projects">‹ Projects</div><div class="c"></div><div class="r"><span data-go="ph-find">⌕</span><span data-go="ph-map">⌘</span><span data-go="ph-since">↻</span><span>⋯</span></div></div>
+          <div class="large">Pride and Prejudice<small>today +812 of 1,000 · backed up 3 min ago</small></div>
+          <div class="list">
+            <div class="sh"><span>Volume One · Longbourn</span><b>7,812</b></div>
+            <div class="sec">
+              <div class="prow sel" data-go="ph-editor"><span class="ic">▤</span><div class="t"><span>A truth universally acknowledged</span><small>Bennet hears Netherfield is let</small></div><span class="n">2,318</span><span class="chev">›</span></div>
+              <div class="prow" data-go="ph-editor"><span class="ic">▤</span><div class="t"><span>Netherfield</span><small>The carriage turns in at the gates</small></div><span class="n">3,004</span><span class="chev">›</span></div>
+              <div class="prow" data-go="ph-editor"><span class="ic">▤</span><div class="t"><span>The assembly ball</span><small>Darcy will not dance</small></div><span class="n">2,490</span><span class="chev">›</span></div>
+            </div>
+            <div class="sh"><span>Meryton</span><b>4,190</b></div>
+            <div class="sec">
+              <div class="prow" data-go="ph-editor"><span class="ic">▤</span><div class="t"><span>A visit returned</span><small>Mr. Bennet has called already</small></div><span class="n">724</span><span class="chev">›</span></div>
+              <div class="prow" data-go="ph-editor"><span class="ic">▤</span><div class="t"><span>Jane's letter</span><small>&nbsp;</small></div><span class="n">3,466</span><span class="chev">›</span></div>
+            </div>
+            <div class="sh"><span>Recently removed</span></div>
+            <div class="sec">
+              <div class="prow"><span class="ic" style="color:var(--text-3)">▤</span><div class="t"><span style="color:var(--text-2)">Mary at the piano</span><small>Longbourn · Sep 19</small></div><button>Restore</button></div>
+            </div>
+          </div>
+          <div class="pfoot">14,242 words of 90,000<div class="meter"><i style="width:16%"></i></div></div>
+        </div>
+
+        <!-- Editor -->
+        <div class="pane" id="ph-editor" hidden>
+          <div class="nav"><div class="l" data-go="ph-binder">‹ Binder</div><div class="c"><b>A truth universally acknowledged</b><small id="ph-which" data-go="ph-takes">Main ▾<span class="dot"></span></small></div><div class="r"><span>⋯</span></div></div>
+          <div class="pprose">
+            <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+            <p>However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered the rightful property of some one or other of their daughters.</p>
+            <p>“My dear Mr. Bennet,” said his lady to him one day, “have you heard that Netherfield Park is let at last?” <span class="note">[[check the day]]</span></p>
+            <p>Mr. Bennet replied that he had not.<span class="cursor"></span></p>
+          </div>
+          <div class="kbar">
+            <div class="takebar" id="ph-takebar" hidden><button class="q">✕ Discard</button><button>✓ Keep Take 2</button></div>
+            <div class="acc"><span>*</span><span>**</span><span>[[ ]]</span><span>* * *</span><span>¶↑</span><span>¶↓</span><span class="done">Done</span></div>
+            <div class="keys">keyboard</div>
+          </div>
+        </div>
+
+        <!-- Takes sheet over editor -->
+        <div class="pane" id="ph-takes" hidden>
+          <div class="nav"><div class="l">‹ Binder</div><div class="c"><b>A truth universally acknowledged</b><small>Main ▾</small></div><div class="r"><span>⋯</span></div></div>
+          <div class="pprose" style="height:300px"><p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p><p>However little known the feelings or views of such a man may be on his first entering a neighbourhood…</p></div>
+          <div class="scrim" data-go="ph-editor"></div>
+          <div class="sheet mid">
+            <div class="grab"></div>
+            <div class="sh2">Takes <span data-go="ph-editor">Done</span></div>
+            <div class="list">
+              <div class="sec">
+                <div class="prow sel" data-go="ph-editor"><span class="ic">▤</span><div class="t"><span>Main</span><small>2,318 words</small></div><span class="chev">✓</span></div>
+                <div class="prow" data-take="take2" data-go="ph-editor"><span class="ic">⑂</span><div class="t"><span>Take 2</span><small>+41 −69 vs main · 3 saves</small></div><span class="chev">›</span></div>
+              </div>
+              <div class="sh">Discarded</div>
+              <div class="sec">
+                <div class="prow"><span class="ic" style="opacity:.5">⑂</span><div class="t"><span style="color:var(--text-2)">Colder opening</span><small>+190 −107 vs main</small></div><button>Restore</button></div>
+              </div>
+              <div class="sec"><div class="prow"><span class="ic">＋</span><div class="t"><span style="color:var(--accent)">New Take…</span></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compare sheet -->
+        <div class="pane" id="ph-compare" hidden>
+          <div class="nav"><div class="l">‹ Binder</div><div class="c"><b>A truth universally acknowledged</b><small>Take 2 ▾</small></div><div class="r"><span>⋯</span></div></div>
+          <div class="pprose" style="height:230px"><p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p><p>Mr. Bennet made no answer at all.</p></div>
+          <div class="scrim" data-go="ph-editor"></div>
+          <div class="sheet tall">
+            <div class="grab"></div>
+            <div class="sh2">Compare <span data-go="ph-editor">Done</span></div>
+            <div class="field"><span>Against</span><b>Main now ▾</b></div>
+            <p class="hint">2 paragraphs changed  +3 −2 words</p>
+            <div class="pdiff">
+              <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+              <p class="ch">Mr. Bennet <span class="del">made no answer.</span><span class="ins">made no answer at all.</span></p>
+              <div class="btns"><span>⟵ Take theirs</span></div>
+              <p>“Do you not want to know who has taken it?” cried his wife impatiently.</p>
+              <p class="ch"><span class="ins">Not for a moment.</span></p>
+              <div class="btns"><span>✕ Drop</span></div>
+              <p>“You want to tell me, and I have no objection to hearing it.”</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Find sheet over binder -->
+        <div class="pane" id="ph-find" hidden>
+          <div class="nav"><div class="l">‹ Projects</div><div class="c"></div><div class="r"><span>⌕</span><span>⌘</span><span>↻</span><span>⋯</span></div></div>
+          <div class="large">Pride and Prejudice<small>today +812 of 1,000</small></div>
+          <div class="scrim" data-go="ph-binder"></div>
+          <div class="sheet tall">
+            <div class="grab"></div>
+            <div class="sh2">Find <span data-go="ph-binder">Done</span></div>
+            <div class="field focus"><b>Bingley</b><span>⌫</span></div>
+            <div class="hint" style="display:flex;justify-content:space-between"><span>☐ Takes too</span><span>4 in 3 places</span></div>
+            <div class="list">
+              <div class="sh">Longbourn</div>
+              <div class="sec">
+                <div class="prow" data-go="ph-editor"><div class="t"><small>A truth universally acknowledged · ¶12</small><span style="white-space:normal;font-size:15px">…that his name was <b>Bingley</b>, and he was to take possession…</span></div></div>
+                <div class="prow" data-go="ph-editor"><div class="t"><small>Netherfield · ¶2</small><span style="white-space:normal;font-size:15px">Mr. <b>Bingley</b> met them on the steps himself…</span></div></div>
+                <div class="prow" data-go="ph-editor"><div class="t"><small>The assembly ball · ¶1</small><span style="white-space:normal;font-size:15px">Mr. <b>Bingley</b> was good-looking and gentlemanlike…</span></div></div>
+                <div class="prow" data-go="ph-editor"><div class="t"><small>The assembly ball · ¶9</small><span style="white-space:normal;font-size:15px">…between him and Mr. <b>Bingley</b> there was a great difference…</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map (push) -->
+        <div class="pane" id="ph-map" hidden>
+          <div class="nav"><div class="l" data-go="ph-binder">‹ Binder</div><div class="c"><b>Map</b><small>Longbourn ▾</small></div><div class="r"></div></div>
+          <p class="hint" style="margin-top:6px">3 scenes · 3 takes · tap a card to open it</p>
+          <div class="pmap">
+            <div class="pcard" style="border:2px solid var(--accent)"><b>▤ A truth universally acknowledged</b><small>Bennet hears Netherfield is let · 2,318 words</small></div>
+            <div class="pcard take"><b>⑂ Take 2</b><small>+41 −69 vs main · 3 saves</small></div>
+            <div class="pcard dis"><b>⑂ Colder opening</b><small>+190 −107 vs main · discarded · tap to bring back</small></div>
+            <div class="pcard"><b>▤ Netherfield</b><small>The carriage turns in at the gates · 3,004 words</small></div>
+            <div class="pcard"><b>▤ The assembly ball</b><small>Darcy will not dance · 2,490 words</small></div>
+            <div class="pcard take"><b>⑂ Take A: Late in, early out</b><small>+612 −1,000 vs main · 1 save</small></div>
+          </div>
+        </div>
+
+        <!-- Since (push) -->
+        <div class="pane" id="ph-since" hidden>
+          <div class="nav"><div class="l" data-go="ph-binder">‹ Binder</div><div class="c"><b>Since</b><small>First draft · Sep 12 ▾</small></div><div class="r"></div></div>
+          <p class="hint" style="margin-top:6px">4 of 6 scenes moved · +1,940 −730 words</p>
+          <div class="list">
+            <div class="sh">Longbourn</div>
+            <div class="sec">
+              <div class="prow2" data-go="ph-editor"><span class="ic-pen">✎</span><span>A truth universally acknowledged</span><span class="c">+212 −88</span><div class="bar2"><i class="r" style="width:12%"></i><i class="g" style="width:28%"></i></div></div>
+              <div class="prow2"><span class="ic-same">○</span><span>Netherfield</span><span class="c">unchanged</span><div class="bar2"></div></div>
+              <div class="prow2" data-go="ph-editor"><span class="ic-pen">✎</span><span>The assembly ball</span><span class="c">+1,004 −402</span><div class="bar2"><i class="r" style="width:40%"></i><i class="g" style="width:50%"></i></div></div>
+            </div>
+            <div class="sh">Meryton</div>
+            <div class="sec">
+              <div class="prow2"><span class="ic-plus">⊕</span><span>A visit returned</span><span class="c">new, 724</span><div class="bar2"><i class="g" style="width:36%"></i></div></div>
+              <div class="prow2"><span class="ic-same">○</span><span>Jane's letter</span><span class="c">unchanged</span><div class="bar2"></div></div>
+            </div>
+            <div class="sh">Gone since</div>
+            <div class="sec">
+              <div class="prow2"><span class="ic-minus">⊖</span><span style="color:var(--text-2)">Mary at the piano</span><span class="c">−240</span><div class="bar2"><i class="r" style="width:24%"></i></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pull conflict sheet -->
+        <div class="pane" id="ph-pull" hidden>
+          <div class="nav"><div class="l">‹ Projects</div><div class="c"></div><div class="r"><span>⌕</span><span>⌘</span><span>↻</span><span>⋯</span></div></div>
+          <div class="large">Pride and Prejudice<small>pulling…</small></div>
+          <div class="scrim"></div>
+          <div class="sheet tall">
+            <div class="grab"></div>
+            <div class="sh2">Both sides changed <span data-go="ph-binder">Later</span></div>
+            <p class="hint">The remote and this iPhone both changed since they last agreed. Take never merges prose. Your text here goes into a take on each scene you changed, named for today, and main takes the remote's. Nothing is lost; the Mac sees the takes on its next pull.</p>
+            <div class="list">
+              <div class="sh">Changed on this iPhone</div>
+              <div class="sec">
+                <div class="prow"><span class="ic">▤</span><div class="t"><span>A truth universally acknowledged</span><small>+18 −4 words here · +212 −88 on the remote</small></div></div>
+                <div class="prow"><span class="ic">▤</span><div class="t"><span>Jane's letter</span><small>+140 words here · unchanged on the remote</small></div></div>
+              </div>
+            </div>
+            <div class="gap"></div>
+            <div class="field" style="background:var(--accent);justify-content:center"><b style="color:#fff;font-weight:600">Keep mine as takes, then pull</b></div>
+            <p class="hint" style="text-align:center">Two takes named “iPhone Sep 24”</p>
+          </div>
+        </div>
+
+        <div class="home"></div>
+      </div>
+    </div></div>
+    <p class="caption" id="ph-caption">The first screen. Tap Pride and Prejudice to open its binder.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var captions={
+    'mac-editor':'The layout the Mac has today. The toolbar sits in three groups: make, this take, views. Click a binder row to open it; click Take 2 in Versions to see Keep and Discard appear.',
+    'mac-compare':'Compare in the inspector, widened. Each paragraph that differs ends in a link that takes the other side into the editor, unsaved.',
+    'mac-map':'The chapter as a map: scenes in a line, takes beneath. A tinted node is a live take; a faded dashed one is discarded and comes back on a click.',
+    'mac-since':'Every scene against a milestone: what came, what went, and how much, with the scenes gone since at the end. A row opens Compare on that milestone.',
+    'ph-projects':'The first screen. Tap Pride and Prejudice to open its binder.',
+    'ph-binder':'The binder: chapters as sections, the synopsis under each scene, words at the right, the total and target at the bottom. Find, Map, Since and the menu sit in the bar.',
+    'ph-editor':'The page, edge to edge, in the system serif. The caption under the title says which text this is; tap it for the takes. The keyboard bar has the six things the phone needs and nothing else.',
+    'ph-takes':'The Takes sheet at the medium detent: main, the live takes with their deltas, the discarded ones with Restore, and New Take. Tap Take 2, then look at the editor.',
+    'ph-compare':'Compare as a sheet. At the medium detent the page stays readable above it; the links become buttons under each changed paragraph.',
+    'ph-find':'Find over the binder, the field focused. A result opens the scene with the hit selected and closes the sheet.',
+    'ph-map':'The map turned tall: each scene a card, its takes indented beneath, live ones tinted and discarded ones faded.',
+    'ph-since':'Since as a grouped list with the same symbols, counts and bars as the Mac.',
+    'ph-pull':'When both sides moved, Take does not merge prose. The phone offers one way through: its changes become takes, main takes the remote.'
+  };
+  function show(prefix,id){
+    document.querySelectorAll('#stage-'+prefix+' .pane[id^="'+prefix+'-"]').forEach(function(p){
+      if(prefix==='mac'&&!/^mac-(prose|map|since)$/.test(p.id))return; p.hidden=(p.id!==id);
+    });
+    document.querySelectorAll('#tabs-'+prefix+' button').forEach(function(b){b.setAttribute('aria-selected',String(b.dataset.screen===id));});
+    var cap=document.getElementById(prefix==='mac'?'mac-caption':'ph-caption'); if(cap&&captions[id])cap.textContent=captions[id];
+  }
+  function macScreen(id){
+    var page={'mac-editor':'mac-prose','mac-compare':'mac-prose','mac-map':'mac-map','mac-since':'mac-since'}[id];
+    ['mac-prose','mac-map','mac-since'].forEach(function(p){document.getElementById(p).hidden=(p!==page);});
+    document.getElementById('mac-b-map').classList.toggle('on',id==='mac-map');
+    document.getElementById('mac-b-since').classList.toggle('on',id==='mac-since');
+    document.getElementById('mac-b-compare').classList.toggle('on',id==='mac-compare');
+    macPane(id==='mac-compare'?'compare':'versions');
+    document.querySelectorAll('#tabs-mac button').forEach(function(b){b.setAttribute('aria-selected',String(b.dataset.screen===id));});
+    document.getElementById('mac-caption').textContent=captions[id];
+  }
+  var names={versions:'Versions',compare:'Compare',scene:'Scene',find:'Find',untangle:'Untangle'};
+  function macPane(p){
+    document.querySelectorAll('#mac-segi span').forEach(function(s){s.classList.toggle('on',s.dataset.pane===p);});
+    Object.keys(names).forEach(function(k){document.getElementById('mac-pane-'+k).hidden=(k!==p);});
+    document.getElementById('mac-pane-name').textContent=names[p];
+    document.getElementById('mac-cols').classList.toggle('wide-insp',p==='compare');
+  }
+  document.querySelectorAll('#mac-segi span').forEach(function(s){s.addEventListener('click',function(){macPane(s.dataset.pane);});});
+  document.querySelectorAll('#tabs-mac button').forEach(function(b){b.addEventListener('click',function(){macScreen(b.dataset.screen);});});
+  document.querySelectorAll('#stage-mac .binder .row[data-scene]').forEach(function(r){r.addEventListener('click',function(){
+    document.querySelectorAll('#stage-mac .binder .row').forEach(function(x){x.classList.remove('sel');}); r.classList.add('sel');
+    macScreen('mac-editor'); setTake('main'); document.getElementById('mac-msg').textContent='Opened '+r.querySelector('.t').firstChild.textContent;
+  });});
+  function setTake(t){
+    var inTake=(t==='take2');
+    document.getElementById('mac-keep').hidden=!inTake; document.getElementById('mac-discard').hidden=!inTake;
+    document.getElementById('mac-which').textContent=inTake?'Take: Take 2':'Main';
+    document.getElementById('mac-msg').textContent=inTake?'Opened Take 2 from 3f1c9a2':'Checkpoint 3f1c9a2';
+    document.querySelectorAll('#mac-pane-versions .vrow[data-take]').forEach(function(v){v.classList.toggle('sel',v.dataset.take===t);});
+    var ph=document.getElementById('ph-which'); if(ph){ph.innerHTML=(inTake?'Take 2 ▾':'Main ▾')+'<span class="dot"></span>';}
+    var tb=document.getElementById('ph-takebar'); if(tb)tb.hidden=!inTake;
+  }
+  document.querySelectorAll('#mac-pane-versions .vrow[data-take]').forEach(function(v){v.addEventListener('click',function(){setTake(v.dataset.take);});});
+  document.querySelectorAll('.tb button, .vrow button, .removed button, .prow button').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();});});
+
+  function phoneScreen(id){
+    document.querySelectorAll('#stage-phone .pane').forEach(function(p){p.hidden=(p.id!==id);});
+    document.querySelectorAll('#tabs-phone button').forEach(function(b){b.setAttribute('aria-selected',String(b.dataset.screen===id));});
+    document.getElementById('ph-caption').textContent=captions[id]||'';
+  }
+  document.querySelectorAll('#tabs-phone button').forEach(function(b){b.addEventListener('click',function(){phoneScreen(b.dataset.screen);});});
+  document.querySelectorAll('#stage-phone [data-go]').forEach(function(el){el.addEventListener('click',function(e){
+    e.stopPropagation(); if(el.dataset.take)setTake(el.dataset.take); phoneScreen(el.dataset.go);
+  });});
+
+  function device(d){
+    document.getElementById('stage-mac').hidden=(d!=='mac'); document.getElementById('stage-phone').hidden=(d!=='phone');
+    document.getElementById('tabs-mac').hidden=(d!=='mac'); document.getElementById('tabs-phone').hidden=(d!=='phone');
+    document.querySelectorAll('.seg button').forEach(function(b){b.setAttribute('aria-selected',String(b.dataset.dev===d));});
+    try{localStorage.setItem('take-screens-device',d);}catch(_){}
+    fit();
+  }
+  document.querySelectorAll('.seg button').forEach(function(b){b.addEventListener('click',function(){device(b.dataset.dev);});});
+  function fit(){
+    document.querySelectorAll('.frame').forEach(function(f){
+      var natural=f.classList.contains('mac-frame')?1100:393; var s=f.clientWidth/natural;
+      f.querySelector('.scale').style.transform='scale('+s+')';
+    });
+  }
+  window.addEventListener('resize',fit);
+  var start='mac'; try{start=localStorage.getItem('take-screens-device')||'mac';}catch(_){}
+  if(location.hash==='#phone')start='phone';
+  device(start); fit();
+})();
+</script>
