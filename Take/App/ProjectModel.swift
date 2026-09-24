@@ -56,7 +56,7 @@ final class ProjectModel {
     @ObservationIgnored private var bench: Task<Void, Never>?
     /// Reads the editor's text on demand, once the editor exists.
     @ObservationIgnored private var readEditor: (() -> String?)?
-    @ObservationIgnored private let log = Logger(subsystem: "com.siddharthnigam.spike", category: "editor")
+    @ObservationIgnored private let log = Logger(subsystem: "com.siddharthnigam.take", category: "editor")
 
     static let idleSaveDelay: Duration = .seconds(10)
 
@@ -179,7 +179,7 @@ final class ProjectModel {
 
     // MARK: - Bench
 
-    /// With `-SpikeBench` on the command line (or the `SpikeBench` default set),
+    /// With `-TakeBench` on the command line (or the `TakeBench` default set),
     /// runs the benchmark once the editor exists, writes `bench.json` beside the
     /// project and quits, so a harness needs nothing from the UI.
     func editorReady(_ textView: ProseTextView) {
@@ -345,11 +345,11 @@ final class ProjectModel {
     static var projectFolder: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return support.appendingPathComponent("Spike", isDirectory: true)
+        return support.appendingPathComponent("Take", isDirectory: true)
             .appendingPathComponent("Sample Project", isDirectory: true)
     }
 
-    static let isBenchRequested = CommandLine.arguments.contains("-SpikeBench") || UserDefaults.standard.bool(forKey: "SpikeBench")
+    static let isBenchRequested = CommandLine.arguments.contains("-TakeBench") || UserDefaults.standard.bool(forKey: "TakeBench")
 
     static var benchFile: URL {
         projectFolder.deletingLastPathComponent().appendingPathComponent("bench.json")

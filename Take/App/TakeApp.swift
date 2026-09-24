@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SpikeApp: App {
+struct TakeApp: App {
     @State private var model = ProjectModel()
 
     var body: some Scene {

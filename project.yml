@@ -1,4 +1,4 @@
-name: Spike
+name: Take
 options:
   bundleIdPrefix: com.siddharthnigam
   deploymentTarget:
@@ -21,40 +21,39 @@ packages:
     path: ManuscriptKit
 
 targets:
-  # The spike app. A placeholder name; the product is unnamed.
-  Spike:
+  Take:
     type: application
     platform: macOS
     sources:
-      - path: Spike
+      - path: Take
         excludes:
           - "Resources/**"
-          - "Spike.entitlements"
-      - path: Spike/Resources
+          - "Take.entitlements"
+      - path: Take/Resources
         buildPhase: resources
         type: folder
     dependencies:
       - package: ManuscriptKit
         product: ManuscriptKit
     info:
-      path: Spike/Info.plist
+      path: Take/Info.plist
       properties:
-        CFBundleDisplayName: Spike
+        CFBundleDisplayName: Take
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: ""
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.siddharthnigam.spike
-        PRODUCT_NAME: Spike
-        CODE_SIGN_ENTITLEMENTS: Spike/Spike.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.siddharthnigam.take
+        PRODUCT_NAME: Take
+        CODE_SIGN_ENTITLEMENTS: Take/Take.entitlements
         ENABLE_APP_SANDBOX: YES
         COMBINE_HIDPI_IMAGES: YES
 
 schemes:
-  Spike:
+  Take:
     build:
       targets:
-        Spike: all
+        Take: all
     run:
       config: Debug

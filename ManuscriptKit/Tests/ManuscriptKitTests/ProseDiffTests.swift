@@ -167,7 +167,7 @@ import Testing
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-        .appendingPathComponent("Spike/Resources/sample-scene.md")
+        .appendingPathComponent("Take/Resources/sample-scene.md")
 
     static func sample() throws -> String {
         try String(contentsOf: sampleURL, encoding: .utf8)

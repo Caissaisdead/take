@@ -10,7 +10,7 @@ import Testing
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-        .appendingPathComponent("Spike/Resources/sample-scene.md")
+        .appendingPathComponent("Take/Resources/sample-scene.md")
 
     /// `text` with one paragraph rewritten, back in stored form.
     private static func replacing(_ index: Int, in text: String, _ edit: (String) -> String) -> String {
