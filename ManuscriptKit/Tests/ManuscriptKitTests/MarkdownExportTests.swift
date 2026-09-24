@@ -110,4 +110,26 @@ import Testing
             #expect(files[0].text == "# P&P\n\n## One\n\nMain text.\n")
         }
     }
+
+    @Test func oneChapterExportsAlone() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let part = try store.addPart(title: "Volume One")
+            let one = try store.addChapter(title: "One", toPart: part.id)
+            let two = try store.addChapter(title: "Two", toPart: part.id)
+            _ = try store.addScene(title: "First", toChapter: one.id, text: "One's text.\n")
+            _ = try store.addScene(title: "Second", toChapter: two.id, text: "Two's text.\n")
+
+            let files = try store.exportMarkdown(chapter: two.id)
+            #expect(files.map(\.path) == ["P&P.md", "01 Two/01 Second.md"])
+            #expect(files[0].text == "# P&P\n\n## Two\n\nTwo's text.\n")
+            let cut = try store.manifest(chapter: two.id)
+            #expect(cut.chapters.map(\.id) == [two.id])
+            #expect(!cut.usesParts)
+            #expect(try store.manifest().only(chapter: UUID()) == nil)
+            #expect(throws: ProjectStoreError.unknownChapter(UUID(uuidString: "00000000-0000-0000-0000-000000000000")!)) {
+                try store.exportMarkdown(chapter: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!)
+            }
+        }
+    }
 }

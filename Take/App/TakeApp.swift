@@ -31,10 +31,12 @@ struct TakeApp: App {
             }
             CommandGroup(replacing: .importExport) {
                 Menu("Export") {
-                    Button("Markdown Folder…") { model.exportMarkdown() }
+                    Button("Markdown Folder…") { model.export(.markdown) }
                         .keyboardShortcut("e", modifiers: [.command, .shift])
-                    Button("Word Document…") { model.exportDocx() }
+                    Button("Word Document…") { model.export(.docx) }
                         .keyboardShortcut("e", modifiers: [.command, .option])
+                    Button("PDF…") { model.export(.pdf) }
+                        .keyboardShortcut("e", modifiers: [.command, .control])
                 }
                 .disabled(model.manuscript.scenes.isEmpty)
             }

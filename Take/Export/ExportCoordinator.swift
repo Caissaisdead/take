@@ -31,11 +31,20 @@ enum ExportCoordinator {
 
     /// Asks where to save a Word document and writes `data` there.
     static func exportDocx(_ data: Data, suggestedName: String) async throws -> URL? {
+        try await save(data, title: "Export as Word Document", name: suggestedName + ".docx", type: UTType(filenameExtension: "docx") ?? .data)
+    }
+
+    /// Asks where to save a PDF and writes `data` there.
+    static func exportPDF(_ data: Data, suggestedName: String) async throws -> URL? {
+        try await save(data, title: "Export as PDF", name: suggestedName + ".pdf", type: .pdf)
+    }
+
+    private static func save(_ data: Data, title: String, name: String, type: UTType) async throws -> URL? {
         let panel = NSSavePanel()
-        panel.title = "Export as Word Document"
+        panel.title = title
         panel.prompt = "Export"
-        panel.nameFieldStringValue = suggestedName + ".docx"
-        panel.allowedContentTypes = [UTType(filenameExtension: "docx") ?? .data]
+        panel.nameFieldStringValue = name
+        panel.allowedContentTypes = [type]
         panel.canCreateDirectories = true
         panel.showsTagField = false
         guard await panel.begin() == .OK, let url = panel.url else { return nil }

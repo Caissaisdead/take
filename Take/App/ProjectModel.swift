@@ -856,53 +856,46 @@ final class ProjectModel {
 
     // MARK: - Export
 
-    /// The draft on main as Markdown, after saving whatever is unsaved so the
-    /// export matches the screen.
-    func exportMarkdown() {
+    enum ExportKind { case markdown, docx, pdf }
+
+    /// The draft on main, or one chapter of it, as a folder of Markdown, a
+    /// Word document or a PDF, after saving whatever is unsaved so the export
+    /// matches the screen.
+    func export(_ kind: ExportKind, chapter: UUID? = nil) {
         guard let store else { return }
         settle()
         guard !isDirty else { return }
-        let files: [ExportFile]
+        let name = MarkdownExport.fileName(
+            chapter.flatMap { manuscript.chapter($0)?.title } ?? manuscript.title,
+            fallback: chapter == nil ? "Manuscript" : "Chapter")
         do {
-            files = try store.exportMarkdown()
+            let head = try store.mainHead()
+            let cut = try store.manifest(chapter: chapter)
+            let text: (SceneID) throws -> String = { try store.sceneText($0, at: head) }
+            switch kind {
+            case .markdown:
+                let files = try store.exportMarkdown(chapter: chapter)
+                Task { await finish("Exported \(files.count) files") { try await ExportCoordinator.exportMarkdown(files, suggestedName: name) } }
+            case .docx:
+                let data = try DocxWriter.data(for: cut, text: text)
+                Task { await finish("Exported") { try await ExportCoordinator.exportDocx(data, suggestedName: name) } }
+            case .pdf:
+                let data = try PDFWriter.data(for: cut, text: text)
+                Task { await finish("Exported") { try await ExportCoordinator.exportPDF(data, suggestedName: name) } }
+            }
         } catch {
             statusLine = "Export failed: \(error.localizedDescription)"
-            return
-        }
-        let name = MarkdownExport.fileName(manuscript.title, fallback: "Manuscript")
-        Task {
-            do {
-                if let folder = try await ExportCoordinator.exportMarkdown(files, suggestedName: name) {
-                    statusLine = "Exported \(files.count) files to \(folder.lastPathComponent)"
-                }
-            } catch {
-                statusLine = "Export failed: \(error.localizedDescription)"
-            }
         }
     }
 
-    /// The draft on main as a Word document.
-    func exportDocx() {
-        guard let store else { return }
-        settle()
-        guard !isDirty else { return }
-        let data: Data
+    /// Runs the save panel and reports where the export went, or why not.
+    private func finish(_ verb: String, _ save: () async throws -> URL?) async {
         do {
-            let head = try store.mainHead()
-            data = try DocxWriter.data(for: try store.manifest()) { try store.sceneText($0, at: head) }
+            if let url = try await save() {
+                statusLine = "\(verb) to \(url.lastPathComponent)"
+            }
         } catch {
             statusLine = "Export failed: \(error.localizedDescription)"
-            return
-        }
-        let name = MarkdownExport.fileName(manuscript.title, fallback: "Manuscript")
-        Task {
-            do {
-                if let url = try await ExportCoordinator.exportDocx(data, suggestedName: name) {
-                    statusLine = "Exported \(url.lastPathComponent)"
-                }
-            } catch {
-                statusLine = "Export failed: \(error.localizedDescription)"
-            }
         }
     }
 

@@ -122,6 +122,17 @@ public struct Manuscript: Codable, Hashable, Sendable {
         scenes.first { $0.id == id }
     }
 
+    /// The manuscript cut down to one chapter, for exporting it alone: the
+    /// same title, one untitled part, that chapter. Nil for a chapter that is
+    /// not here.
+    public func only(chapter id: UUID) -> Manuscript? {
+        guard let chapter = chapter(id) else { return nil }
+        var cut = Manuscript(title: title, parts: [Part(title: "", chapters: [chapter])])
+        cut.target = target
+        cut.dailyTarget = dailyTarget
+        return cut
+    }
+
     public func part(containing chapter: UUID) -> Part? {
         parts.first { $0.chapters.contains { $0.id == chapter } }
     }

@@ -492,11 +492,20 @@ public final class ProjectStore {
 
     // MARK: - Export
 
-    /// The draft on main as Markdown files, combined draft first.
-    public func exportMarkdown() throws -> [ExportFile] {
-        let manuscript = try manifest()
+    /// The draft on main as Markdown files, combined draft first; or one
+    /// chapter of it.
+    public func exportMarkdown(chapter: UUID? = nil) throws -> [ExportFile] {
+        let manuscript = try manifest(chapter: chapter)
         let head = try mainHead()
         return try MarkdownExport.files(for: manuscript) { try sceneText($0, at: head) }
+    }
+
+    /// The manifest, or the one chapter of it that an export asks for.
+    public func manifest(chapter: UUID?) throws -> Manuscript {
+        let whole = try manifest()
+        guard let chapter else { return whole }
+        guard let cut = whole.only(chapter: chapter) else { throw ProjectStoreError.unknownChapter(chapter) }
+        return cut
     }
 
     // MARK: - Takes
