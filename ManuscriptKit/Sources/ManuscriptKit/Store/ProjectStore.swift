@@ -4,6 +4,9 @@ import Foundation
 public enum ProjectStoreError: Error, Equatable, Sendable {
     /// Main has no commit yet, so there is nothing to read.
     case unbornMain
+    /// The manifest was written by a different version of the code.
+    case unsupportedFormat(Int)
+    case unknownPart(UUID)
     case unknownChapter(UUID)
     case unknownScene(SceneID)
     /// A file the manifest promises is not in the tree.
@@ -57,32 +60,131 @@ public final class ProjectStore {
         return try commitIndex(message: message, parents: [head])
     }
 
-    /// Adds a scene at the end of `chapter` (or of a first chapter made for it),
-    /// writes its file and commits.
+    // MARK: - Shape
+
+    /// Adds a part at the end and commits.
+    public func addPart(title: String) throws -> Part {
+        var manuscript = try manifest()
+        let part = Part(title: title)
+        manuscript.append(part)
+        try saveManifest(manuscript, message: "Add part \(Self.label(title))")
+        return part
+    }
+
+    /// Adds a chapter at the end of `part` (or of the last part, or of an
+    /// untitled part made for it) and commits. The chapter's folder is fixed
+    /// here, from its title and its number among all chapters.
+    public func addChapter(title: String, toPart part: UUID?) throws -> Chapter {
+        var manuscript = try manifest()
+        let chapter = try newChapter(title: title, in: &manuscript)
+        try manuscript.append(chapter, toPart: try Self.destinationPart(part, in: &manuscript))
+        try saveManifest(manuscript, message: "Add chapter \(Self.label(title))")
+        return chapter
+    }
+
+    /// Adds a scene at the end of `chapter` (or of the last chapter, or of a
+    /// first chapter made for it), writes its file and commits.
     public func addScene(title: String, toChapter chapter: UUID?, text: String) throws -> SceneRef {
         var manuscript = try manifest()
-        let index: Int
-        if let chapter {
-            guard let found = manuscript.chapters.firstIndex(where: { $0.id == chapter }) else {
-                throw ProjectStoreError.unknownChapter(chapter)
-            }
-            index = found
-        } else {
-            if manuscript.chapters.isEmpty {
-                manuscript.chapters.append(Chapter(title: "Chapter 1"))
-            }
-            index = 0
-        }
-
         let head = try mainHead()
-        let path = try scenePath(for: title, inChapter: index, of: manuscript, at: head)
+        let destination: UUID
+        if let chapter {
+            guard manuscript.chapter(chapter) != nil else { throw ProjectStoreError.unknownChapter(chapter) }
+            destination = chapter
+        } else if let last = manuscript.chapters.last {
+            destination = last.id
+        } else {
+            let first = try newChapter(title: "Chapter 1", in: &manuscript)
+            try manuscript.append(first, toPart: try Self.destinationPart(nil, in: &manuscript))
+            destination = first.id
+        }
+        let path = try scenePath(for: title, in: manuscript.chapter(destination)!, of: manuscript, at: head)
         let scene = SceneRef(id: SceneID(), title: title, path: path)
-        manuscript.chapters[index].scenes.append(scene)
+        try manuscript.append(scene, toChapter: destination)
 
         try repository.writeWorkingFile(atPath: path, data: stored(text))
         try writeManifest(manuscript)
-        try commitIndex(message: "Add \(title)", parents: [head])
+        try commitIndex(message: "Add \(Self.label(title))", parents: [head])
         return scene
+    }
+
+    public func rename(part id: UUID, to title: String) throws {
+        var manuscript = try manifest()
+        let old = try Self.require(manuscript.part(id), ProjectStoreError.unknownPart(id)).title
+        try manuscript.rename(part: id, to: title)
+        try saveManifest(manuscript, message: "Rename part \(Self.label(old)) to \(Self.label(title))")
+    }
+
+    public func rename(chapter id: UUID, to title: String) throws {
+        var manuscript = try manifest()
+        let old = try Self.require(manuscript.chapter(id), ProjectStoreError.unknownChapter(id)).title
+        try manuscript.rename(chapter: id, to: title)
+        try saveManifest(manuscript, message: "Rename chapter \(Self.label(old)) to \(Self.label(title))")
+    }
+
+    /// The file keeps its name; only the manifest changes.
+    public func rename(scene id: SceneID, to title: String) throws {
+        var manuscript = try manifest()
+        let old = try sceneRef(id).title
+        try manuscript.rename(scene: id, to: title)
+        try saveManifest(manuscript, message: "Rename \(Self.label(old)) to \(Self.label(title))")
+    }
+
+    /// Moves never touch files: order is the manifest's alone.
+    public func move(scene id: SceneID, toChapter chapter: UUID, at index: Int) throws {
+        var manuscript = try manifest()
+        let title = try sceneRef(id).title
+        try manuscript.move(scene: id, toChapter: chapter, at: index)
+        try saveManifest(manuscript, message: "Move \(Self.label(title))")
+    }
+
+    public func move(chapter id: UUID, toPart part: UUID, at index: Int) throws {
+        var manuscript = try manifest()
+        let title = try Self.require(manuscript.chapter(id), ProjectStoreError.unknownChapter(id)).title
+        try manuscript.move(chapter: id, toPart: part, at: index)
+        try saveManifest(manuscript, message: "Move chapter \(Self.label(title))")
+    }
+
+    public func move(part id: UUID, to index: Int) throws {
+        var manuscript = try manifest()
+        let title = try Self.require(manuscript.part(id), ProjectStoreError.unknownPart(id)).title
+        try manuscript.move(part: id, to: index)
+        try saveManifest(manuscript, message: "Move part \(Self.label(title))")
+    }
+
+    /// Takes the scene out of the manifest and its file out of the tree. The
+    /// text stays in history, and any takes on it keep their refs.
+    public func remove(scene id: SceneID) throws {
+        var manuscript = try manifest()
+        let head = try mainHead()
+        let scene = try manuscript.remove(scene: id)
+        try repository.removeWorkingFile(atPath: scene.path)
+        try writeManifest(manuscript)
+        try commitIndex(message: "Remove \(Self.label(scene.title))", parents: [head])
+    }
+
+    /// The chapter and every scene in it, in one commit.
+    public func remove(chapter id: UUID) throws {
+        var manuscript = try manifest()
+        let head = try mainHead()
+        let chapter = try manuscript.remove(chapter: id)
+        for scene in chapter.scenes {
+            try repository.removeWorkingFile(atPath: scene.path)
+        }
+        try writeManifest(manuscript)
+        try commitIndex(message: "Remove chapter \(Self.label(chapter.title))", parents: [head])
+    }
+
+    /// The part and everything under it, in one commit.
+    public func remove(part id: UUID) throws {
+        var manuscript = try manifest()
+        let head = try mainHead()
+        let part = try manuscript.remove(part: id)
+        for scene in part.chapters.flatMap(\.scenes) {
+            try repository.removeWorkingFile(atPath: scene.path)
+        }
+        try writeManifest(manuscript)
+        try commitIndex(message: "Remove part \(Self.label(part.title))", parents: [head])
     }
 
     public func mainHead() throws -> ObjectID {
@@ -251,7 +353,13 @@ public final class ProjectStore {
         guard let entry = try entry(Manuscript.manifestPath, at: commit) else {
             throw ProjectStoreError.missingFile(Manuscript.manifestPath)
         }
-        return try JSONDecoder().decode(Manuscript.self, from: try repository.readBlob(entry.id))
+        let data = try repository.readBlob(entry.id)
+        // The format is checked on its own first, so an older manifest says so
+        // instead of failing on whatever key it lacks.
+        struct Stamp: Decodable { var format: Int? }
+        let format = try JSONDecoder().decode(Stamp.self, from: data).format ?? 1
+        guard format == Manuscript.currentFormat else { throw ProjectStoreError.unsupportedFormat(format) }
+        return try JSONDecoder().decode(Manuscript.self, from: data)
     }
 
     private func writeManifest(_ manuscript: Manuscript) throws {
@@ -302,20 +410,57 @@ public final class ProjectStore {
         Self.takesPrefix + scene.uuid.uuidString.lowercased() + "/"
     }
 
-    /// `chapters/<NN>-<chapter slug>/<NN>-<scene slug>.md`, numbered by position
-    /// in the manifest at the time the scene is added.
-    private func scenePath(for title: String, inChapter index: Int, of manuscript: Manuscript, at head: ObjectID) throws -> String {
-        let chapter = manuscript.chapters[index]
-        let folder = "chapters/\(Self.number(index + 1))-\(Self.slug(chapter.title, fallback: "chapter"))"
+    /// A chapter with its folder fixed: `chapters/<NN>-<slug>`, numbered by how
+    /// many chapters the manuscript has had before it. Chapters are numbered
+    /// across parts, so the folder never says which part it is in.
+    private func newChapter(title: String, in manuscript: inout Manuscript) throws -> Chapter {
+        let stem = "chapters/\(Self.number(manuscript.chapters.count + 1))-\(Self.slug(title, fallback: "chapter"))"
+        let used = Set(manuscript.chapters.map(\.folder))
+        let tree = try repository.commit(try mainHead()).tree
+        // A removed chapter's folder is gone from the tree with its scenes, but
+        // a reordered one keeps its number, so a fresh number can still collide.
+        let folder = try Self.unique(stem) { candidate in
+            try used.contains(candidate) || repository.entry(atPath: candidate, inTree: tree) != nil
+        }
+        return Chapter(title: title, folder: folder)
+    }
+
+    /// `part` itself, or the last part, or an untitled part appended for the
+    /// purpose.
+    private static func destinationPart(_ part: UUID?, in manuscript: inout Manuscript) throws -> UUID {
+        if let part {
+            guard manuscript.part(part) != nil else { throw ProjectStoreError.unknownPart(part) }
+            return part
+        }
+        if let last = manuscript.parts.last { return last.id }
+        let made = Part(title: "")
+        manuscript.append(made)
+        return made.id
+    }
+
+    /// `<chapter folder>/<NN>-<scene slug>.md`, numbered by the chapter's scene
+    /// count at the time the scene is added.
+    private func scenePath(for title: String, in chapter: Chapter, of manuscript: Manuscript, at head: ObjectID) throws -> String {
         let stem = "\(Self.number(chapter.scenes.count + 1))-\(Self.slug(title, fallback: "scene"))"
-        let listed = Set(manuscript.chapters.flatMap(\.scenes).map(\.path))
+        let listed = Set(manuscript.scenes.map(\.path))
         let tree = try repository.commit(head).tree
         // Reordering never renames files, so a fresh number can still collide.
         let name = try Self.unique(stem) { candidate in
-            let path = "\(folder)/\(candidate).md"
+            let path = "\(chapter.folder)/\(candidate).md"
             return try listed.contains(path) || repository.entry(atPath: path, inTree: tree) != nil
         }
-        return "\(folder)/\(name).md"
+        return "\(chapter.folder)/\(name).md"
+    }
+
+    /// A title as a commit message shows it; an empty one reads as untitled.
+    private static func label(_ title: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "(untitled)" : trimmed
+    }
+
+    private static func require<T>(_ value: T?, _ error: ProjectStoreError) throws -> T {
+        guard let value else { throw error }
+        return value
     }
 
     private static func number(_ n: Int) -> String {

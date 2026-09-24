@@ -280,11 +280,19 @@ public final class Repository {
         try check(git_index_write(index), "git_index_write")
     }
 
-    /// Deletes the file at `path` and removes it from the index.
+    /// Deletes the file at `path` and removes it from the index. Git tracks no
+    /// folders, so a folder left empty by the deletion goes too, up to the root.
     public func removeWorkingFile(atPath path: String) throws {
         let file = workingDirectory.appendingPathComponent(path)
         if FileManager.default.fileExists(atPath: file.path) {
             try FileManager.default.removeItem(at: file)
+        }
+        var folder = file.deletingLastPathComponent().standardizedFileURL
+        let root = workingDirectory.standardizedFileURL
+        while folder.path != root.path, folder.path.hasPrefix(root.path),
+              (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.isEmpty == true {
+            try FileManager.default.removeItem(at: folder)
+            folder = folder.deletingLastPathComponent()
         }
         let index = try openIndex()
         defer { git_index_free(index) }
