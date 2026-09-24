@@ -95,6 +95,12 @@ struct ContentView: View {
         .sheet(item: $model.conflict) { conflict in
             ConflictSheet(conflict: conflict)
         }
+        .sheet(isPresented: $model.consent) {
+            ConsentSheet()
+        }
+        .sheet(isPresented: Binding(get: { model.takeRuns != nil }, set: { if !$0 { model.cancelThreeTakes() } })) {
+            ThreeTakesSheet()
+        }
         .confirmationDialog("Discard this take?", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("Discard Take", role: .destructive) { model.discard() }
         } message: {
@@ -296,6 +302,96 @@ private struct NameSheet: View {
 /// A keep that met a moved main: the three texts side by side, and a choice of
 /// whole scene. Paragraph-level picking is not offered; a writer's merge is a
 /// selection.
+/// Asked before the first send, and every time unless the writer says not to.
+private struct ConsentSheet: View {
+    @Environment(ProjectModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var alwaysAsk = !(UserDefaults.standard.object(forKey: ConsentGate.alwaysAskKey) as? Bool == false)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Send this scene to Anthropic?")
+                .font(.headline)
+            Text("Three Takes sends the open scene, the scenes on either side of it, and the Untangle beat sheet if there is one, to Anthropic's API under your own key. Anthropic's usage policy and privacy terms apply. Nothing else leaves this Mac, and Untangle never sends anything.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle("Ask every time", isOn: $alwaysAsk)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Send") {
+                    ConsentGate.agree(alwaysAsk: alwaysAsk)
+                    dismiss()
+                    model.writeThreeTakes()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+    }
+}
+
+/// The three angles and how far each has got.
+private struct ThreeTakesSheet: View {
+    @Environment(ProjectModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Three takes of “\(model.sceneTitle)”")
+                .font(.headline)
+            Text("Written one after another on \(ClaudeClient.model), each told what the earlier ones did.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            ForEach(model.takeRuns ?? []) { run in
+                HStack(alignment: .top, spacing: 10) {
+                    icon(for: run.state)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Take \(run.angle.id): \(run.angle.name)")
+                            .fontWeight(.medium)
+                        Text(run.angle.card)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(detail(for: run.state))
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            HStack {
+                Spacer()
+                Button(model.isWritingTakes ? "Stop" : "Done") { model.cancelThreeTakes() }
+                    .keyboardShortcut(model.isWritingTakes ? .cancelAction : .defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+    }
+
+    @ViewBuilder
+    private func icon(for state: ProjectModel.TakeRun.State) -> some View {
+        switch state {
+        case .waiting: Image(systemName: "circle.dotted").foregroundStyle(.secondary)
+        case .writing: ProgressView().controlSize(.small)
+        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        }
+    }
+
+    private func detail(for state: ProjectModel.TakeRun.State) -> String {
+        switch state {
+        case .waiting: return "Waiting"
+        case .writing: return "Writing…"
+        case .done(let note): return note
+        case .failed(let why): return why
+        }
+    }
+}
+
 private struct ConflictSheet: View {
     @Environment(ProjectModel.self) private var model
     @Environment(\.dismiss) private var dismiss

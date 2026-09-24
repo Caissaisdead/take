@@ -157,7 +157,7 @@ final class ProjectModel {
             setEditorText("", dirty: false)
             manuscript = try opened.manifest()
             refresh()
-            if url != Self.sampleFolder { Self.remember(url) }
+            Self.remember(url)
             statusLine = "Opened \(url.path)"
             if let first = manuscript.scenes.first {
                 select(.main(first.id))
@@ -608,6 +608,97 @@ final class ProjectModel {
             }
             isUntangling = false
         }
+    }
+
+    // MARK: - Three Takes
+
+    /// One angle's progress in the sheet.
+    struct TakeRun: Identifiable, Hashable {
+        enum State: Hashable { case waiting, writing, done(String), failed(String) }
+        let angle: ThreeTakes.Angle
+        var state: State = .waiting
+        var id: String { angle.id }
+    }
+
+    /// Non-nil while the sheet is up; the runs it shows.
+    var takeRuns: [TakeRun]?
+    /// The consent sheet, up until the writer answers.
+    var consent: Bool = false
+    @ObservationIgnored private var takesTask: Task<Void, Never>?
+
+    var isWritingTakes: Bool {
+        takeRuns?.contains { $0.state == .writing || $0.state == .waiting } ?? false
+    }
+
+    /// Draft > Three Takes: asks once if the writer has not settled consent,
+    /// then writes the three.
+    func requestThreeTakes() {
+        guard selection != nil, !isWritingTakes else { return }
+        guard ClaudeClient.hasKey else {
+            statusLine = "Add an Anthropic API key in Settings first."
+            return
+        }
+        if ConsentGate.isSettled {
+            writeThreeTakes()
+        } else {
+            consent = true
+        }
+    }
+
+    /// Writes the takes one after another from main's copy of the scene, so
+    /// unsaved text is saved first and every take starts at the same base.
+    func writeThreeTakes() {
+        guard let store, let scene = selection?.sceneID else { return }
+        settle()
+        guard !isDirty else { return }
+        if isInTake { select(.main(scene)) }
+        let brief = ThreeTakes.Brief(
+            manuscriptTitle: manuscript.title,
+            sceneTitle: sceneTitle,
+            draft: (try? store.sceneText(scene)) ?? "",
+            before: neighbour(of: scene, offset: -1).flatMap { try? store.sceneText($0) },
+            after: neighbour(of: scene, offset: 1).flatMap { try? store.sceneText($0) },
+            untangling: untangling)
+        takeRuns = ThreeTakes.angles.map { TakeRun(angle: $0) }
+        takesTask?.cancel()
+        takesTask = Task {
+            var written: [String] = []
+            for (index, angle) in ThreeTakes.angles.enumerated() {
+                guard !Task.isCancelled else { return }
+                takeRuns?[index].state = .writing
+                do {
+                    let text = Prose.normalize(try await ClaudeClient.complete(
+                        system: ThreeTakes.system,
+                        user: ThreeTakes.prompt(for: brief, angle: angle, previous: written)))
+                    guard !Task.isCancelled else { return }
+                    let take = try store.createTake(for: scene, name: "Take \(angle.id): \(angle.name)")
+                    try store.saveTake(take, text: text)
+                    written.append(text)
+                    takeRuns?[index].state = .done("\(Prose.wordCount(text)) words")
+                    refresh()
+                } catch {
+                    takeRuns?[index].state = .failed(error.localizedDescription)
+                }
+            }
+            let made = written.count
+            statusLine = made == 3 ? "Three takes written; pick one in the map or the inspector" : "\(made) of 3 takes written"
+            refresh()
+        }
+    }
+
+    func cancelThreeTakes() {
+        takesTask?.cancel()
+        takesTask = nil
+        takeRuns = nil
+        refresh()
+    }
+
+    /// The scene before or after this one in manuscript order.
+    private func neighbour(of scene: SceneID, offset: Int) -> SceneID? {
+        let all = manuscript.scenes.map(\.id)
+        guard let index = all.firstIndex(of: scene) else { return nil }
+        let target = index + offset
+        return all.indices.contains(target) ? all[target] : nil
     }
 
     // MARK: - Export

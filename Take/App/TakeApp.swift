@@ -42,6 +42,9 @@ struct TakeApp: App {
                 Button("Untangle This Scene") { NotificationCenter.default.post(name: .showUntangle, object: nil) }
                     .keyboardShortcut("u", modifiers: .command)
                     .disabled(model.selection == nil)
+                Button("Three Takes…") { model.requestThreeTakes() }
+                    .keyboardShortcut("3", modifiers: [.command, .option])
+                    .disabled(model.selection == nil || model.isWritingTakes)
                 Button("Mark Milestone…") { model.naming = .milestone }
                     .keyboardShortcut("m", modifiers: .command)
                     .disabled(model.manuscript.scenes.isEmpty)
@@ -58,6 +61,9 @@ struct TakeApp: App {
                 Button("Keep Take") { model.keep() }
                     .disabled(!model.isInTake)
             }
+        }
+        Settings {
+            SettingsView()
         }
     }
 }
