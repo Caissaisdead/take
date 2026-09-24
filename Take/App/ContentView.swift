@@ -87,7 +87,7 @@ struct ContentView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .disabled(model.selection == nil)
-                    CompareView(diff: compareDiff, onPick: { model.pick(segment: $0) })
+                    CompareView(diff: compareDiff, accent: Accent(rawValue: accentName) ?? .blue, onPick: { model.pick(segment: $0) })
                         .equatable()
                 case .untangle:
                     UntangleView()
@@ -222,6 +222,7 @@ struct ContentView: View {
 
 private struct DetailView: View {
     @Environment(ProjectModel.self) private var model
+    @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
 
     var body: some View {
         VStack(spacing: 0) {
@@ -233,6 +234,7 @@ private struct DetailView: View {
                     text: model.editorText,
                     loadToken: model.loadToken,
                     selection: model.editorSelection,
+                    accent: Accent(rawValue: accentName) ?? .blue,
                     onChange: { model.textChanged() },
                     onLoad: { model.recordLoad(millis: $0) },
                     onReady: { model.editorReady($0) },

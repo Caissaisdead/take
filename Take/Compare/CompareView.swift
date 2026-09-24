@@ -7,10 +7,12 @@ import ManuscriptKit
 /// keystroke that redraws the window.
 struct CompareView: View, Equatable {
     let diff: ProseDiff?
+    /// The links' colour; part of equality, so a new accent redraws the diff.
+    var accent: Accent = .blue
     /// A click on a paragraph's link: the segment whose other side to take.
     var onPick: (Int) -> Void = { _ in }
 
-    static func == (lhs: CompareView, rhs: CompareView) -> Bool { lhs.diff == rhs.diff }
+    static func == (lhs: CompareView, rhs: CompareView) -> Bool { lhs.diff == rhs.diff && lhs.accent == rhs.accent }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -22,7 +24,7 @@ struct CompareView: View, Equatable {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Divider()
             if let diff {
-                DiffTextView(content: DiffRenderer.render(diff), onPick: onPick)
+                DiffTextView(content: DiffRenderer.render(diff, accent: accent), accent: accent, onPick: onPick)
             } else {
                 ContentUnavailableView(
                     "Nothing to compare",
@@ -46,6 +48,7 @@ struct CompareView: View, Equatable {
 /// the renderer's links hands the segment back.
 private struct DiffTextView: NSViewRepresentable {
     let content: NSAttributedString
+    var accent: Accent
     var onPick: (Int) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -91,7 +94,8 @@ private struct DiffTextView: NSViewRepresentable {
         textView.frame = NSRect(origin: .zero, size: scrollView.contentSize)
         textView.delegate = context.coordinator
         textView.isAutomaticLinkDetectionEnabled = false
-        textView.linkTextAttributes = [.foregroundColor: NSColor.linkColor, .cursor: NSCursor.pointingHand]
+        textView.linkTextAttributes = [.foregroundColor: accent.nsColor, .cursor: NSCursor.pointingHand]
+        textView.selectedTextAttributes = [.backgroundColor: accent.nsColor.withAlphaComponent(0.22)]
         textView.textStorage?.setAttributedString(content)
 
         scrollView.documentView = textView
@@ -100,6 +104,10 @@ private struct DiffTextView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.onPick = onPick
+        if let textView = scrollView.documentView as? NSTextView {
+            textView.linkTextAttributes = [.foregroundColor: accent.nsColor, .cursor: NSCursor.pointingHand]
+            textView.selectedTextAttributes = [.backgroundColor: accent.nsColor.withAlphaComponent(0.22)]
+        }
         guard let textView = scrollView.documentView as? NSTextView,
               let storage = textView.textStorage,
               !storage.isEqual(to: content) else { return }

@@ -11,6 +11,8 @@ struct EditorView: NSViewRepresentable {
     var loadToken: Int
     /// Selected once the text is loaded; nil puts the caret at the top.
     var selection: NSRange? = nil
+    /// The accent the caret and selection are drawn in; applied on every change.
+    var accent: Accent = .blue
     var onChange: () -> Void = {}
     var onLoad: (_ millis: Double) -> Void = { _ in }
     /// Receives the text view once it exists, for the in-app bench.
@@ -50,6 +52,10 @@ struct EditorView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         let coordinator = context.coordinator
         coordinator.parent = self
+        if coordinator.appliedAccent != accent, let textView = coordinator.textView {
+            coordinator.appliedAccent = accent
+            textView.apply(accent)
+        }
         guard let textView = coordinator.textView, coordinator.loadedToken != loadToken else { return }
         coordinator.loadedToken = loadToken
         textView.setText(text, selecting: selection)
@@ -64,6 +70,7 @@ struct EditorView: NSViewRepresentable {
         var parent: EditorView
         weak var textView: ProseTextView?
         var loadedToken = 0
+        var appliedAccent: Accent = .blue
 
         init(parent: EditorView) {
             self.parent = parent

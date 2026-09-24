@@ -157,6 +157,13 @@ final class ProseTextView: NSTextView {
         defaultParagraphStyle = ProseStyle.paragraph
         typingAttributes = ProseStyle.base
         textStorage?.delegate = styler
+        apply(Accent.current)
+    }
+
+    /// The caret and the selection in the writer's accent.
+    func apply(_ accent: Accent) {
+        insertionPointColor = accent.nsColor
+        selectedTextAttributes = [.backgroundColor: accent.nsColor.withAlphaComponent(0.22)]
     }
 
     /// Replaces the whole document, restyles it once and reports the time taken,
