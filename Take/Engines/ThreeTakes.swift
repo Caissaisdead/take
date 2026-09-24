@@ -42,7 +42,9 @@ enum ThreeTakes {
     Answer with the prose of the scene only: plain paragraphs separated by blank lines, Markdown *emphasis* where the manuscript uses it, no title, no preamble, no notes.
     """
 
-    static func prompt(for brief: Brief, angle: Angle, previous: [String]) -> String {
+    /// `previous` carries each earlier take with the angle it was written on,
+    /// so a take that failed leaves no gap for the names to slip into.
+    static func prompt(for brief: Brief, angle: Angle, previous: [(angle: Angle, text: String)]) -> String {
         var parts: [String] = []
         parts.append("Manuscript: \(brief.manuscriptTitle)\nScene: \(brief.sceneTitle)")
         if let before = brief.before, !before.isEmpty {
@@ -62,8 +64,8 @@ enum ThreeTakes {
         } else {
             parts.append("The current draft of the scene:\n\n\(brief.draft)")
         }
-        for (index, take) in previous.enumerated() {
-            parts.append("A take already written (\(angles[index].name)); do not reuse its opening image, its structure or its last line:\n\n\(take)")
+        for take in previous {
+            parts.append("A take already written (\(take.angle.name)); do not reuse its opening image, its structure or its last line:\n\n\(take.text)")
         }
         parts.append("The angle for this take, \(angle.id), \(angle.name): \(angle.card)\n\nWrite the scene.")
         return parts.joined(separator: "\n\n---\n\n")

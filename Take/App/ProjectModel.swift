@@ -709,24 +709,29 @@ final class ProjectModel {
         takeRuns = ThreeTakes.angles.map { TakeRun(angle: $0) }
         takesTask?.cancel()
         takesTask = Task {
-            var written: [String] = []
+            var written: [(angle: ThreeTakes.Angle, text: String)] = []
             for (index, angle) in ThreeTakes.angles.enumerated() {
                 guard !Task.isCancelled else { return }
                 takeRuns?[index].state = .writing
                 do {
-                    let text = Prose.normalize(try await ClaudeClient.complete(
+                    let reply = try await ClaudeClient.complete(
                         system: ThreeTakes.system,
-                        user: ThreeTakes.prompt(for: brief, angle: angle, previous: written)))
+                        user: ThreeTakes.prompt(for: brief, angle: angle, previous: written))
                     guard !Task.isCancelled else { return }
+                    let text = Prose.normalize(reply.text)
                     let take = try store.createTake(for: scene, name: "Take \(angle.id): \(angle.name)")
                     try store.saveTake(take, text: text)
-                    written.append(text)
-                    takeRuns?[index].state = .done("\(Prose.wordCount(text)) words")
+                    written.append((angle, text))
+                    let words = "\(Prose.wordCount(text)) words"
+                    takeRuns?[index].state = .done(reply.wasCut ? "\(words), cut short at the length limit" : words)
                     refresh()
                 } catch {
+                    // A stop mid-call surfaces as an error; it is not a failure.
+                    guard !Task.isCancelled else { return }
                     takeRuns?[index].state = .failed(error.localizedDescription)
                 }
             }
+            guard !Task.isCancelled else { return }
             let made = written.count
             statusLine = made == 3 ? "Three takes written; pick one in the map or the inspector" : "\(made) of 3 takes written"
             refresh()

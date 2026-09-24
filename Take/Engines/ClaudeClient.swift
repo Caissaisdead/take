@@ -21,9 +21,17 @@ struct ClaudeClient {
         APIKeyStore.read() != nil
     }
 
+    /// One reply for one user turn under a system prompt.
+    struct Completion {
+        var text: String
+        /// The reply ran into `maxTokens` and stops short.
+        var wasCut: Bool
+    }
+
     /// One reply's text for one user turn under a system prompt. Thinking is
-    /// adaptive by default on this model; effort sets how much.
-    static func complete(system: String, user: String, maxTokens: Int = 8_000, effort: String = "high") async throws -> String {
+    /// adaptive by default on this model; effort sets how much. The length is
+    /// the reference's default for a call that is not streamed.
+    static func complete(system: String, user: String, maxTokens: Int = 16_000, effort: String = "high") async throws -> Completion {
         guard let key = APIKeyStore.read() else { throw EngineError.notReady("No Anthropic API key. Add one in Settings.") }
         let body: [String: Any] = [
             "model": model,
@@ -91,7 +99,7 @@ struct ClaudeClient {
     }
 
     /// The reply's text, or what went wrong with it.
-    private static func text(from data: Data, status: Int) throws -> String {
+    private static func text(from data: Data, status: Int) throws -> Completion {
         guard (200...299).contains(status) else {
             let message = (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error.message
             switch status {
@@ -103,10 +111,7 @@ struct ClaudeClient {
         if envelope.stop_reason == "refusal" { throw EngineError.refused }
         let text = envelope.content.filter { $0.type == "text" }.compactMap(\.text).joined()
         guard !text.isEmpty else { throw EngineError.failed("The API answered without text.") }
-        if envelope.stop_reason == "max_tokens" {
-            return text + "\n\n[The take ran past its length and was cut here.]"
-        }
-        return text
+        return Completion(text: text, wasCut: envelope.stop_reason == "max_tokens")
     }
 
     private struct MessageEnvelope: Decodable {
