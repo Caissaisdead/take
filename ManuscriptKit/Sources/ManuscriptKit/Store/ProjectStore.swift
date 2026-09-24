@@ -84,7 +84,7 @@ public final class ProjectStore {
         return store
     }
 
-    private init(repository: Repository, author: Signature) {
+    init(repository: Repository, author: Signature) {
         self.repository = repository
         self.author = author
     }
@@ -692,7 +692,7 @@ public final class ProjectStore {
         return manuscript
     }
 
-    private func writeManifest(_ manuscript: Manuscript) throws {
+    func writeManifest(_ manuscript: Manuscript) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         var data = try encoder.encode(manuscript)
@@ -702,7 +702,7 @@ public final class ProjectStore {
 
     /// Commits whatever the index holds onto main.
     @discardableResult
-    private func commitIndex(message: String, parents: [ObjectID]) throws -> ObjectID {
+    func commitIndex(message: String, parents: [ObjectID]) throws -> ObjectID {
         let tree = try repository.writeIndexTree()
         return try repository.createCommit(tree: tree, parents: parents, author: stamp(), message: message, updatingRef: Self.mainRef)
     }
@@ -728,7 +728,7 @@ public final class ProjectStore {
 
     /// The bytes a scene is kept as: UTF-8 ending in exactly one newline, so two
     /// saves of the same prose hash the same.
-    private func stored(_ text: String) -> Data {
+    func stored(_ text: String) -> Data {
         var body = Substring(text)
         while let last = body.last, last == "\n" || last == "\r\n" {
             body.removeLast()
@@ -743,7 +743,7 @@ public final class ProjectStore {
     /// A chapter with its folder fixed: `chapters/<NN>-<slug>`, numbered by how
     /// many chapters the manuscript has had before it. Chapters are numbered
     /// across parts, so the folder never says which part it is in.
-    private func newChapter(title: String, in manuscript: inout Manuscript) throws -> Chapter {
+    func newChapter(title: String, in manuscript: inout Manuscript) throws -> Chapter {
         let stem = "chapters/\(number(manuscript.chapters.count + 1))-\(Self.slug(title, fallback: "chapter"))"
         let used = Set(manuscript.chapters.map(\.folder))
         let tree = try repository.commit(try mainHead()).tree
@@ -757,7 +757,7 @@ public final class ProjectStore {
 
     /// `part` itself, or the last part, or an untitled part appended for the
     /// purpose.
-    private static func destinationPart(_ part: UUID?, in manuscript: inout Manuscript) throws -> UUID {
+    static func destinationPart(_ part: UUID?, in manuscript: inout Manuscript) throws -> UUID {
         if let part {
             guard manuscript.part(part) != nil else { throw ProjectStoreError.unknownPart(part) }
             return part
@@ -770,7 +770,7 @@ public final class ProjectStore {
 
     /// `<chapter folder>/<NN>-<scene slug>.md`, numbered by the chapter's scene
     /// count at the time the scene is added.
-    private func scenePath(for title: String, in chapter: Chapter, of manuscript: Manuscript, at head: ObjectID) throws -> String {
+    func scenePath(for title: String, in chapter: Chapter, of manuscript: Manuscript, at head: ObjectID) throws -> String {
         let stem = "\(number(chapter.scenes.count + 1))-\(Self.slug(title, fallback: "scene"))"
         let listed = Set(manuscript.scenes.map(\.path))
         let tree = try repository.commit(head).tree
@@ -783,7 +783,7 @@ public final class ProjectStore {
     }
 
     /// A title as a commit message shows it; an empty one reads as untitled.
-    private static func label(_ title: String) -> String {
+    static func label(_ title: String) -> String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "(untitled)" : trimmed
     }

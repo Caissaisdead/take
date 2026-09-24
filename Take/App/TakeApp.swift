@@ -17,6 +17,8 @@ struct TakeApp: App {
                 Button("Open Project…") { model.openProject() }
                     .keyboardShortcut("o", modifiers: .command)
                 Button("Open Sample Project") { model.openSample() }
+                Button("Import Manuscript…") { model.importProject() }
+                    .keyboardShortcut("i", modifiers: [.command, .shift])
                 Divider()
                 Button("New Scene…") { model.naming = .scene }
                     .keyboardShortcut("n", modifiers: .command)

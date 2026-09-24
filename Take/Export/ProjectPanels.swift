@@ -20,15 +20,30 @@ enum ProjectPanels {
     }
 
     /// Where to make a new project; the folder's name is the project's title.
-    static func chooseNewProjectFolder() async -> URL? {
+    static func chooseNewProjectFolder(named name: String = "Untitled Manuscript", message: String? = nil) async -> URL? {
         let panel = NSSavePanel()
         panel.title = "New Project"
-        panel.message = "The folder becomes a git repository with one file per scene."
+        panel.message = message ?? "The folder becomes a git repository with one file per scene."
         panel.prompt = "Create"
         panel.nameFieldLabel = "Project name:"
-        panel.nameFieldStringValue = "Untitled Manuscript"
+        panel.nameFieldStringValue = name
         panel.canCreateDirectories = true
         panel.showsTagField = false
+        guard await panel.begin() == .OK else { return nil }
+        return panel.url
+    }
+
+    /// A manuscript to import: a Markdown, text or Word file, or a folder of
+    /// Markdown files.
+    static func chooseImport() async -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = "Import Manuscript"
+        panel.message = "A Markdown, text or Word file, or a folder of Markdown files with one file per scene. Headings become chapters and scenes."
+        panel.prompt = "Import"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.plainText, .folder, UTType(filenameExtension: "md") ?? .plainText, UTType(filenameExtension: "markdown") ?? .plainText, UTType(filenameExtension: "docx") ?? .data]
         guard await panel.begin() == .OK else { return nil }
         return panel.url
     }
