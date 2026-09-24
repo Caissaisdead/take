@@ -52,6 +52,14 @@ struct BinderView: View {
                         .selectionDisabled()
                 }
             }
+            if !model.removed.isEmpty {
+                Section("Recently removed") {
+                    ForEach(model.removed) { removed in
+                        RemovedRow(removed: removed)
+                            .selectionDisabled()
+                    }
+                }
+            }
         }
         .listStyle(.sidebar)
         .confirmationDialog(removalTitle, isPresented: removingBinding, titleVisibility: .visible) {
@@ -200,6 +208,33 @@ private struct SceneRow: View {
                 Divider()
                 Button("Remove Scene…", role: .destructive) { removing = .scene(scene.id) }
             }
+    }
+}
+
+/// A scene history still has, with the chapter it left and a way back.
+private struct RemovedRow: View {
+    @Environment(ProjectModel.self) private var model
+    let removed: RemovedScene
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "doc.text")
+                .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(removed.scene.title)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text("\(removed.chapterTitle.isEmpty ? "Untitled Chapter" : removed.chapterTitle) · \(removed.date, format: .dateTime.month(.abbreviated).day())")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Button("Restore") { model.restore(removed: removed) }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .help("Put the scene back, with its text and its takes")
+        }
     }
 }
 
