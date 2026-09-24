@@ -76,7 +76,7 @@ public enum MarkdownExport {
 
     /// A title as a file or folder name: no slashes or colons, no control
     /// characters, trimmed, never empty and never starting with a dot.
-    static func fileName(_ title: String, fallback: String) -> String {
+    public static func fileName(_ title: String, fallback: String) -> String {
         var name = ""
         for scalar in title.unicodeScalars {
             switch scalar {

@@ -1,7 +1,7 @@
 import Foundation
 
 /// What the store refuses before anything reaches git.
-public enum ProjectStoreError: Error, Equatable, Sendable {
+public enum ProjectStoreError: Error, Equatable, Sendable, LocalizedError {
     /// Main has no commit yet, so there is nothing to read.
     case unbornMain
     /// The manifest was written by a different version of the code.
@@ -11,6 +11,27 @@ public enum ProjectStoreError: Error, Equatable, Sendable {
     case unknownScene(SceneID)
     /// A file the manifest promises is not in the tree.
     case missingFile(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unbornMain:
+            return "The repository has no commit on main yet."
+        case .unsupportedFormat(let format):
+            return format > Manuscript.currentFormat
+                ? "This manuscript was written by a newer version of Take (format \(format))."
+                : "This manuscript is in an older form (format \(format)) that this version of Take does not read."
+        case .unknownPart:
+            return "That part is not in the manuscript."
+        case .unknownChapter:
+            return "That chapter is not in the manuscript."
+        case .unknownScene:
+            return "That scene is not in the manuscript."
+        case .missingFile(let path):
+            return path == Manuscript.manifestPath
+                ? "The folder's repository has no \(path), so it is not a Take project."
+                : "The manuscript names \(path), but the file is not in the draft."
+        }
+    }
 }
 
 /// A writing project on disk: a folder with a git repository, `manuscript.json`

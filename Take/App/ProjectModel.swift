@@ -191,7 +191,7 @@ final class ProjectModel {
             }
         } catch {
             scoped?.stopAccessingSecurityScopedResource()
-            statusLine = "Could not open \(url.lastPathComponent): \(error)"
+            statusLine = "Could not open \(url.lastPathComponent): \(error.localizedDescription)"
         }
     }
 
@@ -603,7 +603,7 @@ final class ProjectModel {
                 }
                 columns.append(MapColumn(scene: scene, main: main, takes: takes))
             } catch {
-                statusLine = "Map failed: \(error)"
+                statusLine = "Map failed: \(error.localizedDescription)"
             }
         }
         return columns
@@ -777,10 +777,10 @@ final class ProjectModel {
         do {
             files = try store.exportMarkdown()
         } catch {
-            statusLine = "Export failed: \(error)"
+            statusLine = "Export failed: \(error.localizedDescription)"
             return
         }
-        let name = manuscript.title.isEmpty ? "Manuscript" : manuscript.title
+        let name = MarkdownExport.fileName(manuscript.title, fallback: "Manuscript")
         Task {
             do {
                 if let folder = try await ExportCoordinator.exportMarkdown(files, suggestedName: name) {
@@ -802,10 +802,10 @@ final class ProjectModel {
             let head = try store.mainHead()
             data = try DocxWriter.data(for: try store.manifest()) { try store.sceneText($0, at: head) }
         } catch {
-            statusLine = "Export failed: \(error)"
+            statusLine = "Export failed: \(error.localizedDescription)"
             return
         }
-        let name = manuscript.title.isEmpty ? "Manuscript" : manuscript.title
+        let name = MarkdownExport.fileName(manuscript.title, fallback: "Manuscript")
         Task {
             do {
                 if let url = try await ExportCoordinator.exportDocx(data, suggestedName: name) {
@@ -971,7 +971,7 @@ final class ProjectModel {
             guard let commit else { return nil }
             return ProseDiffer.diff(old: try store.sceneText(scene, at: commit), new: storedText)
         } catch {
-            statusLine = "Compare failed: \(error)"
+            statusLine = "Compare failed: \(error.localizedDescription)"
             return nil
         }
     }
@@ -1038,7 +1038,7 @@ final class ProjectModel {
         do {
             try body()
         } catch {
-            statusLine = "\(what) failed: \(error)"
+            statusLine = "\(what) failed: \(error.localizedDescription)"
         }
     }
 
