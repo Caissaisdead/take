@@ -104,29 +104,119 @@ final class ProjectModel {
 
     static let idleSaveDelay: Duration = .seconds(10)
 
+    /// The folder the open project lives in.
+    private(set) var projectURL: URL?
+    /// Held for the life of the project so the sandbox keeps the grant.
+    @ObservationIgnored private var scopedURL: URL?
+
     init() {
+        // Bench runs always use the sample; otherwise the last project, else the sample.
+        if !Self.isBenchRequested, let url = Self.lastProjectURL() {
+            open(url)
+        }
+        if store == nil {
+            open(Self.sampleFolder, seedingSample: true)
+        }
+    }
+
+    /// The window's name: the manuscript's title, or the folder's.
+    var projectName: String {
+        manuscript.title.isEmpty ? (projectURL?.lastPathComponent ?? "Take") : manuscript.title
+    }
+
+    // MARK: - Projects
+
+    /// Opens the project at `url`, or makes one there when the folder has no
+    /// repository (the sample is seeded when asked). A failure leaves whatever
+    /// was open as it was.
+    func open(_ url: URL, seedingSample: Bool = false) {
+        settle()
+        guard !isDirty else { return }
         let author = Signature(name: NSFullUserName(), email: "writer@localhost")
-        let folder = Self.projectFolder
+        let scoped = url.startAccessingSecurityScopedResource() ? url : nil
         do {
-            let store: ProjectStore
-            if FileManager.default.fileExists(atPath: folder.appendingPathComponent(".git").path) {
-                store = try ProjectStore.open(at: folder, author: author)
+            let opened: ProjectStore
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) {
+                opened = try ProjectStore.open(at: url, author: author)
             } else {
-                try FileManager.default.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)
-                store = try ProjectStore.create(at: folder, title: "Sample", author: author)
-                let first = try store.addScene(title: "A truth universally acknowledged", toChapter: nil, text: Self.sampleText())
-                let chapter = try store.manifest().chapters.first { $0.scenes.contains { $0.id == first.id } }?.id
-                _ = try store.addScene(title: "Netherfield", toChapter: chapter, text: Self.netherfieldText)
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                opened = try ProjectStore.create(at: url, title: url.lastPathComponent, author: author)
+                if seedingSample {
+                    let first = try opened.addScene(title: "A truth universally acknowledged", toChapter: nil, text: Self.sampleText())
+                    let chapter = try opened.manifest().chapters.first { $0.scenes.contains { $0.id == first.id } }?.id
+                    _ = try opened.addScene(title: "Netherfield", toChapter: chapter, text: Self.netherfieldText)
+                }
             }
-            self.store = store
-            manuscript = try store.manifest()
-            statusLine = "Opened \(folder.path)"
+            scopedURL?.stopAccessingSecurityScopedResource()
+            scopedURL = scoped
+            store = opened
+            projectURL = url
+            selection = nil
+            compareBase = .automatic
+            mapChapter = nil
+            setEditorText("", dirty: false)
+            manuscript = try opened.manifest()
+            refresh()
+            if url != Self.sampleFolder { Self.remember(url) }
+            statusLine = "Opened \(url.path)"
+            if let first = manuscript.scenes.first {
+                select(.main(first.id))
+            }
         } catch {
-            statusLine = "Could not open the project: \(error)"
+            scoped?.stopAccessingSecurityScopedResource()
+            statusLine = "Could not open \(url.lastPathComponent): \(error)"
         }
-        if let first = manuscript.chapters.first?.scenes.first {
-            select(.main(first.id))
+    }
+
+    /// Asks for a folder to open. An empty folder becomes a new project.
+    func openProject() {
+        Task {
+            if let url = await ProjectPanels.chooseProjectFolder() { open(url) }
         }
+    }
+
+    /// Asks where to make a project, named after the folder chosen.
+    func newProject() {
+        Task {
+            if let url = await ProjectPanels.chooseNewProjectFolder() { open(url) }
+        }
+    }
+
+    func openSample() {
+        open(Self.sampleFolder, seedingSample: true)
+    }
+
+    func revealInFinder() {
+        guard let projectURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([projectURL])
+    }
+
+    /// Terminal, opened on the project folder, for a writer who works with
+    /// git or an agent on the real repository.
+    func openInTerminal() {
+        guard let projectURL else { return }
+        let terminal = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+        NSWorkspace.shared.open([projectURL], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            if let error {
+                Task { @MainActor in self.statusLine = "Terminal did not open: \(error.localizedDescription)" }
+            }
+        }
+    }
+
+    private static let bookmarkKey = "LastProjectBookmark"
+
+    private static func remember(_ url: URL) {
+        if let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+            UserDefaults.standard.set(data, forKey: bookmarkKey)
+        }
+    }
+
+    private static func lastProjectURL() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }
+        guard FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) else { return nil }
+        return url
     }
 
     /// The loaded text plus whatever has been typed since.
@@ -759,7 +849,8 @@ final class ProjectModel {
 
     // MARK: - Fixtures
 
-    static var projectFolder: URL {
+    /// The seeded sample, in the app's own container.
+    static var sampleFolder: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return support.appendingPathComponent("Take", isDirectory: true)
@@ -769,7 +860,7 @@ final class ProjectModel {
     static let isBenchRequested = CommandLine.arguments.contains("-TakeBench") || UserDefaults.standard.bool(forKey: "TakeBench")
 
     static var benchFile: URL {
-        projectFolder.deletingLastPathComponent().appendingPathComponent("bench.json")
+        sampleFolder.deletingLastPathComponent().appendingPathComponent("bench.json")
     }
 
     /// The sample scene four times over: about 20k words.

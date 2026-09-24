@@ -112,6 +112,8 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 560)
+        .navigationTitle(model.projectName)
+        .navigationSubtitle((model.projectURL?.deletingLastPathComponent().path(percentEncoded: false) as NSString?)?.abbreviatingWithTildeInPath ?? "")
     }
 
     private var comparing: Bool {

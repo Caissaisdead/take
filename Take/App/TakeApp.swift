@@ -12,6 +12,12 @@ struct TakeApp: App {
         .defaultSize(width: 1100, height: 760)
         .commands {
             CommandGroup(replacing: .newItem) {
+                Button("New Project…") { model.newProject() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                Button("Open Project…") { model.openProject() }
+                    .keyboardShortcut("o", modifiers: .command)
+                Button("Open Sample Project") { model.openSample() }
+                Divider()
                 Button("New Scene…") { model.naming = .scene }
                     .keyboardShortcut("n", modifiers: .command)
                 Button("New Chapter…") { model.naming = .chapter }
@@ -36,6 +42,10 @@ struct TakeApp: App {
                 Button("Mark Milestone…") { model.naming = .milestone }
                     .keyboardShortcut("m", modifiers: .command)
                     .disabled(model.manuscript.scenes.isEmpty)
+                Divider()
+                Button("Reveal in Finder") { model.revealInFinder() }
+                Button("Open in Terminal") { model.openInTerminal() }
+                    .keyboardShortcut("t", modifiers: [.command, .option])
             }
             CommandMenu("Take") {
                 Button("New Take…") { model.naming = .take }
