@@ -48,10 +48,10 @@ enum ThreeTakes {
         var parts: [String] = []
         parts.append("Manuscript: \(brief.manuscriptTitle)\nScene: \(brief.sceneTitle)")
         if let before = brief.before, !before.isEmpty {
-            parts.append("The end of the scene before it:\n\n\(tail(before, words: neighbourWords))")
+            parts.append("The end of the scene before it:\n\n\(Prose.tail(before, words: neighbourWords))")
         }
         if let after = brief.after, !after.isEmpty {
-            parts.append("The start of the scene after it:\n\n\(head(after, words: neighbourWords))")
+            parts.append("The start of the scene after it:\n\n\(Prose.head(after, words: neighbourWords))")
         }
         if let u = brief.untangling {
             var sheet = "What the scene is for: \(u.job)\nThe shift: \(u.shift)\nBeats:\n"
@@ -69,32 +69,5 @@ enum ThreeTakes {
         }
         parts.append("The angle for this take, \(angle.id), \(angle.name): \(angle.card)\n\nWrite the scene.")
         return parts.joined(separator: "\n\n---\n\n")
-    }
-
-    /// The last `words` words, on paragraph boundaries where possible.
-    static func tail(_ text: String, words: Int) -> String {
-        let paragraphs = Prose.paragraphs(text)
-        var kept: [String] = []
-        var count = 0
-        for paragraph in paragraphs.reversed() {
-            let n = Prose.wordCount(paragraph)
-            if count + n > words, !kept.isEmpty { break }
-            kept.insert(paragraph, at: 0)
-            count += n
-        }
-        return Prose.join(kept)
-    }
-
-    static func head(_ text: String, words: Int) -> String {
-        let paragraphs = Prose.paragraphs(text)
-        var kept: [String] = []
-        var count = 0
-        for paragraph in paragraphs {
-            let n = Prose.wordCount(paragraph)
-            if count + n > words, !kept.isEmpty { break }
-            kept.append(paragraph)
-            count += n
-        }
-        return Prose.join(kept)
     }
 }

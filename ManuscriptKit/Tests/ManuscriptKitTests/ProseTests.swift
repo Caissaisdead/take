@@ -82,6 +82,46 @@ import Testing
         #expect(Prose.wordCount(editor) == Prose.wordCount(sample))
     }
 
+    @Test func headAndTailKeepWholeParagraphs() {
+        let text = "One two three.\n\nFour five.\n\nSix seven eight nine.\n"
+        #expect(Prose.head(text, words: 5) == "One two three.\n\nFour five.\n")
+        #expect(Prose.head(text, words: 4) == "One two three.\n")
+        #expect(Prose.head(text, words: 100) == text)
+        #expect(Prose.tail(text, words: 6) == "Four five.\n\nSix seven eight nine.\n")
+        #expect(Prose.tail(text, words: 3) == "Six seven eight nine.\n")
+        #expect(Prose.tail(text, words: 100) == text)
+        // Never nothing: the nearest paragraph comes whole, however long.
+        #expect(Prose.head(text, words: 0) == "One two three.\n")
+        #expect(Prose.tail(text, words: 0) == "Six seven eight nine.\n")
+        #expect(Prose.head("", words: 10) == "")
+        #expect(Prose.tail("", words: 10) == "")
+    }
+
+    @Test func prefixWithinTokensKeepsWholeParagraphs() {
+        let text = "One two three.\n\nFour five.\n\nSix seven eight nine.\n"
+        let whole = Prose.prefix(text, withinTokens: 1_000)
+        #expect(whole.kept == Prose.paragraphs(text))
+        #expect(whole.total == 3)
+        #expect(whole.whole)
+
+        // The text costs about 15 tokens; a budget for two paragraphs keeps two.
+        let cut = Prose.prefix(text, withinTokens: 10)
+        #expect(cut.kept == ["One two three.", "Four five."])
+        #expect(cut.total == 3)
+        #expect(!cut.whole)
+
+        // Not even the first fits: as much of it as does.
+        let sliver = Prose.prefix(text, withinTokens: 2)
+        #expect(sliver.kept == ["One tw"])
+        #expect(sliver.total == 3)
+        #expect(!sliver.whole)
+
+        #expect(Prose.estimateTokens("") == 0)
+        #expect(Prose.estimateTokens(String(repeating: "a", count: 350)) == 100)
+        let empty = Prose.prefix("", withinTokens: 10)
+        #expect(empty.kept.isEmpty && empty.total == 0 && empty.whole)
+    }
+
     @Test func wordCount() {
         #expect(Prose.wordCount("") == 0)
         #expect(Prose.wordCount("   \n\t") == 0)

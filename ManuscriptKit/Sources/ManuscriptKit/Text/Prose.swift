@@ -74,6 +74,61 @@ public enum Prose {
         return count
     }
 
+    /// The first `words` words, in whole paragraphs, in stored form. Always at
+    /// least the first paragraph, however long.
+    public static func head(_ text: String, words: Int) -> String {
+        var kept: [String] = []
+        var count = 0
+        for paragraph in paragraphs(text) {
+            let n = wordCount(paragraph)
+            if count + n > words, !kept.isEmpty { break }
+            kept.append(paragraph)
+            count += n
+        }
+        return join(kept)
+    }
+
+    /// The last `words` words, in whole paragraphs, in stored form. Always at
+    /// least the last paragraph.
+    public static func tail(_ text: String, words: Int) -> String {
+        var kept: [String] = []
+        var count = 0
+        for paragraph in paragraphs(text).reversed() {
+            let n = wordCount(paragraph)
+            if count + n > words, !kept.isEmpty { break }
+            kept.insert(paragraph, at: 0)
+            count += n
+        }
+        return join(kept)
+    }
+
+    /// Roughly 3.5 characters per token in English prose, erring toward more
+    /// tokens so a trim happens before a model's refusal does.
+    public static func estimateTokens(_ text: String) -> Int {
+        (text.utf8.count * 2 + 6) / 7
+    }
+
+    /// Whole paragraphs from the top until `budget` tokens are spent, or every
+    /// paragraph when the whole text fits. When not even the first fits, as
+    /// much of it as does. `total` is how many paragraphs there were and
+    /// `whole` whether all of them are in `kept`, unshortened.
+    public static func prefix(_ text: String, withinTokens budget: Int) -> (kept: [String], total: Int, whole: Bool) {
+        let all = paragraphs(text)
+        guard estimateTokens(text) > budget else { return (all, all.count, true) }
+        var kept: [String] = []
+        var used = 0
+        for paragraph in all {
+            let cost = estimateTokens(paragraph) + 1
+            if used + cost > budget { break }
+            kept.append(paragraph)
+            used += cost
+        }
+        if kept.isEmpty, let first = all.first {
+            return ([String(first.prefix(budget * 3))], all.count, false)
+        }
+        return (kept, all.count, kept.count == all.count)
+    }
+
     /// A paragraph as tokens for word diffing: each word carries the whitespace
     /// that follows it, so `tokens(p).joined() == p`. Leading whitespace, when a
     /// paragraph has any, is a token of its own.

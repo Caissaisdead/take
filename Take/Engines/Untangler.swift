@@ -102,28 +102,12 @@ struct Untangler {
         }
     }
 
-    /// Roughly 3.5 characters per token in English prose, erring toward more
-    /// tokens so a trim happens before a refusal does.
-    static func estimateTokens(_ text: String) -> Int {
-        (text.utf8.count * 2 + 6) / 7
-    }
-
-    /// Whole paragraphs from the top until the budget is spent.
+    /// Whole paragraphs from the top until the budget is spent, and a note
+    /// saying so when that is not all of them.
     static func fit(_ text: String, within budget: Int) -> (String, String?) {
-        let paragraphs = Prose.paragraphs(text)
-        guard estimateTokens(text) > budget else { return (Prose.join(paragraphs), nil) }
-        var kept: [String] = []
-        var used = 0
-        for paragraph in paragraphs {
-            let cost = estimateTokens(paragraph) + 1
-            if used + cost > budget { break }
-            kept.append(paragraph)
-            used += cost
-        }
-        if kept.isEmpty, let first = paragraphs.first {
-            kept = [String(first.prefix(budget * 3))]
-        }
-        return (Prose.join(kept), "Read the first \(kept.count) of \(paragraphs.count) paragraphs; the on-device model holds about \(budget) tokens.")
+        let cut = Prose.prefix(text, withinTokens: budget)
+        guard !cut.whole else { return (Prose.join(cut.kept), nil) }
+        return (Prose.join(cut.kept), "Read the first \(cut.kept.count) of \(cut.total) paragraphs; the on-device model holds about \(budget) tokens.")
     }
 
     private static func clean(_ text: String) -> String {

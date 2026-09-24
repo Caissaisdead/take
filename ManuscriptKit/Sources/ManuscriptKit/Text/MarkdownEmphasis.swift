@@ -2,24 +2,24 @@ import Foundation
 
 /// The three emphasis forms prose Markdown uses, matched the same way in the
 /// editor (which keeps the markers, dimmed) and in exports (which drop them).
-enum MarkdownEmphasis {
-    static let bold = try! NSRegularExpression(pattern: #"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*"#)
-    static let italic = try! NSRegularExpression(pattern: #"(?<!\*)\*(?=[^\s*])([^*\n]+?)(?<=\S)\*(?!\*)"#)
+public enum MarkdownEmphasis {
+    public static let bold = try! NSRegularExpression(pattern: #"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*"#)
+    public static let italic = try! NSRegularExpression(pattern: #"(?<!\*)\*(?=[^\s*])([^*\n]+?)(?<=\S)\*(?!\*)"#)
     // The sample scene marks italics with underscores, as much prose Markdown does.
-    static let underscoreItalic = try! NSRegularExpression(pattern: #"(?<![\w_])_(?=[^\s_])([^_\n]+?)(?<=\S)_(?![\w_])"#)
+    public static let underscoreItalic = try! NSRegularExpression(pattern: #"(?<![\w_])_(?=[^\s_])([^_\n]+?)(?<=\S)_(?![\w_])"#)
 
     /// `* * *` or `---` on a line of its own.
-    static func isSceneBreak(_ paragraph: String) -> Bool {
+    public static func isSceneBreak(_ paragraph: String) -> Bool {
         let trimmed = paragraph.trimmingCharacters(in: .whitespaces)
         return trimmed == "* * *" || trimmed == "---"
     }
 
-    enum Trait { case bold, italic }
+    public enum Trait { case bold, italic }
 
     /// A paragraph with its markers removed and the ranges (in the result) that
     /// carried them. Bold is read first, so `**a *b* c**` is bold with an italic
     /// run inside.
-    static func strip(_ paragraph: String) -> (text: String, runs: [(range: NSRange, trait: Trait)]) {
+    public static func strip(_ paragraph: String) -> (text: String, runs: [(range: NSRange, trait: Trait)]) {
         var text = paragraph as NSString
         var runs: [(NSRange, Trait)] = []
         for (pattern, trait) in [(bold, Trait.bold), (italic, .italic), (underscoreItalic, .italic)] {

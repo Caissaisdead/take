@@ -1,4 +1,5 @@
 import AppKit
+import ManuscriptKit
 
 /// The look of prose in the editor and the compare pane: one serif face, one
 /// measure, so both read as the same text.
