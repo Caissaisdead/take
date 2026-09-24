@@ -1,0 +1,60 @@
+name: Spike
+options:
+  bundleIdPrefix: com.siddharthnigam
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: X7AQ5M6X64
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+
+packages:
+  ManuscriptKit:
+    path: ManuscriptKit
+
+targets:
+  # The spike app. A placeholder name; the product is unnamed.
+  Spike:
+    type: application
+    platform: macOS
+    sources:
+      - path: Spike
+        excludes:
+          - "Resources/**"
+          - "Spike.entitlements"
+      - path: Spike/Resources
+        buildPhase: resources
+        type: folder
+    dependencies:
+      - package: ManuscriptKit
+        product: ManuscriptKit
+    info:
+      path: Spike/Info.plist
+      properties:
+        CFBundleDisplayName: Spike
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siddharthnigam.spike
+        PRODUCT_NAME: Spike
+        CODE_SIGN_ENTITLEMENTS: Spike/Spike.entitlements
+        ENABLE_APP_SANDBOX: YES
+        COMBINE_HIDPI_IMAGES: YES
+
+schemes:
+  Spike:
+    build:
+      targets:
+        Spike: all
+    run:
+      config: Debug
