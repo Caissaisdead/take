@@ -75,6 +75,8 @@ final class ProjectModel {
     private(set) var isDirty = false
     private(set) var takes: [Take] = []
     private(set) var discarded: [Take] = []
+    /// Scenes taken out of the manuscript that history still has.
+    private(set) var removed: [RemovedScene] = []
     private(set) var history: [Version] = []
     private(set) var milestones: [Milestone] = []
     private(set) var wordCount = 0
@@ -997,6 +999,19 @@ final class ProjectModel {
     }
 
     /// Brings a discarded take back to the scene's list and opens it.
+    /// Puts a removed scene back and opens it.
+    func restore(removed scene: RemovedScene) {
+        guard let store else { return }
+        settle()
+        guard !isDirty else { return }
+        attempt("Restore scene") {
+            let back = try store.restore(removed: scene)
+            refresh()
+            select(.main(back.id))
+            statusLine = "Brought back \(back.title)"
+        }
+    }
+
     func restore(discarded take: Take) {
         guard let store else { return }
         if isDirty {
@@ -1096,6 +1111,7 @@ final class ProjectModel {
             totalWords = sceneWords.values.reduce(0, +)
             let atDayStart = try store.wordCountAtStart(of: Date()) ?? 0
             wordsToday = totalWords - atDayStart
+            removed = try store.removedScenes()
             guard let scene = selection?.sceneID else {
                 takes = []
                 discarded = []

@@ -11,6 +11,8 @@ public enum ProjectStoreError: Error, Equatable, Sendable, LocalizedError {
     case unknownScene(SceneID)
     /// A file the manifest promises is not in the tree.
     case missingFile(String)
+    /// A scene with this identity is in the manuscript already.
+    case duplicateScene(SceneID)
 
     public var errorDescription: String? {
         switch self {
@@ -30,6 +32,8 @@ public enum ProjectStoreError: Error, Equatable, Sendable, LocalizedError {
             return path == Manuscript.manifestPath
                 ? "The folder's repository has no \(path), so it is not a Take project."
                 : "The manuscript names \(path), but the file is not in the draft."
+        case .duplicateScene:
+            return "That scene is in the manuscript already."
         }
     }
 }
@@ -56,6 +60,8 @@ public final class ProjectStore {
     /// that read ran back to the root. A later read walks only the commits
     /// since, then goes on with what it had.
     private var historyCache: [SceneID: (head: ObjectID, versions: [Version], exhausted: Bool)] = [:]
+    /// Scenes found removed, walking back from the head they were read at.
+    private var removedCache: (head: ObjectID, found: [RemovedScene])?
     /// Words per blob, so a refresh counts only the scene that changed.
     private var wordsByBlob: [ObjectID: Int] = [:]
     /// The commit a day began at, found once per day.
@@ -124,10 +130,12 @@ public final class ProjectStore {
 
     /// Adds a scene to `chapter` (or to the last chapter, or to a first chapter
     /// made for it) at `index` among its scenes or at the end, writes its file
-    /// and commits.
-    public func addScene(title: String, toChapter chapter: UUID?, at index: Int? = nil, text: String) throws -> SceneRef {
+    /// and commits. A restored scene brings its old identity, so its takes
+    /// answer to it again.
+    public func addScene(title: String, toChapter chapter: UUID?, at index: Int? = nil, text: String, id: SceneID = SceneID(), synopsis: String = "", notes: String = "", message: String? = nil) throws -> SceneRef {
         var manuscript = try manifest()
         let head = try mainHead()
+        guard manuscript.scene(id) == nil else { throw ProjectStoreError.duplicateScene(id) }
         let destination: UUID
         if let chapter {
             guard manuscript.chapter(chapter) != nil else { throw ProjectStoreError.unknownChapter(chapter) }
@@ -140,13 +148,68 @@ public final class ProjectStore {
             destination = first.id
         }
         let path = try scenePath(for: title, in: manuscript.chapter(destination)!, of: manuscript, at: head)
-        let scene = SceneRef(id: SceneID(), title: title, path: path)
+        let scene = SceneRef(id: id, title: title, path: path, synopsis: synopsis, notes: notes)
         try manuscript.insert(scene, inChapter: destination, at: index)
 
         try repository.writeWorkingFile(atPath: path, data: stored(text))
         try writeManifest(manuscript)
-        try commitIndex(message: "Add \(Self.label(title))", parents: [head])
+        try commitIndex(message: message ?? "Add \(Self.label(title))", parents: [head])
         return scene
+    }
+
+    // MARK: - Removed scenes
+
+    /// Scenes taken out of the manuscript and not in it now, most recently
+    /// removed first, found by walking main's first parents and comparing
+    /// each manifest with the one before it. Read from the head last read at,
+    /// like history, so a refresh walks only the commits since.
+    public func removedScenes(limit: Int = 200) throws -> [RemovedScene] {
+        let head = try mainHead()
+        let present = Set(try manifest().scenes.map(\.id))
+        if let cached = removedCache, cached.head == head {
+            return cached.found.filter { !present.contains($0.scene.id) }
+        }
+        var found: [RemovedScene] = []
+        var commit = try repository.commit(head)
+        var manuscript = try manifest(at: head)
+        var steps = 0
+        while steps < limit {
+            if let cached = removedCache, commit.id == cached.head {
+                found.append(contentsOf: cached.found)
+                break
+            }
+            guard let parentID = commit.parents.first else { break }
+            let parent = try repository.commit(parentID)
+            let older = try manifest(at: parentID)
+            let kept = Set(manuscript.scenes.map(\.id))
+            for chapter in older.chapters {
+                for scene in chapter.scenes where !kept.contains(scene.id) {
+                    found.append(RemovedScene(scene: scene, chapter: chapter.id, chapterTitle: chapter.title, removedAt: commit.id, before: parentID, date: commit.author.time))
+                }
+            }
+            commit = parent
+            manuscript = older
+            steps += 1
+        }
+        // A scene removed twice is listed once, as it last was.
+        var seen: Set<SceneID> = []
+        found = found.filter { seen.insert($0.scene.id).inserted }
+        removedCache = (head, found)
+        return found.filter { !present.contains($0.scene.id) }
+    }
+
+    /// Puts a removed scene back with its old identity, text, synopsis and
+    /// notes: at the end of the chapter it was in, when that is still there,
+    /// or of the last chapter. Its takes are listed again by that alone.
+    @discardableResult
+    public func restore(removed: RemovedScene) throws -> SceneRef {
+        guard let entry = try entry(removed.scene.path, at: removed.before) else { throw ProjectStoreError.missingFile(removed.scene.path) }
+        let text = try text(of: entry.id)
+        let chapter = try manifest().chapter(removed.chapter)?.id
+        return try addScene(
+            title: removed.scene.title, toChapter: chapter, text: text,
+            id: removed.scene.id, synopsis: removed.scene.synopsis, notes: removed.scene.notes,
+            message: "Restore \(Self.label(removed.scene.title))")
     }
 
     public func rename(part id: UUID, to title: String) throws {

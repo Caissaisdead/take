@@ -260,6 +260,29 @@ public struct Version: Hashable, Sendable, Identifiable {
     }
 }
 
+/// A scene taken out of the manuscript, as history remembers it.
+public struct RemovedScene: Hashable, Sendable, Identifiable {
+    public var scene: SceneRef
+    /// The chapter it was in, and what that chapter was called then.
+    public var chapter: UUID
+    public var chapterTitle: String
+    /// The commit that removed it, and the one before, which still has its text.
+    public var removedAt: ObjectID
+    public var before: ObjectID
+    public var date: Date
+
+    public var id: SceneID { scene.id }
+
+    public init(scene: SceneRef, chapter: UUID, chapterTitle: String, removedAt: ObjectID, before: ObjectID, date: Date) {
+        self.scene = scene
+        self.chapter = chapter
+        self.chapterTitle = chapterTitle
+        self.removedAt = removedAt
+        self.before = before
+        self.date = date
+    }
+}
+
 /// A named state of the whole draft: an annotated tag on a main commit under
 /// `refs/tags/milestones/<slug>`. Nothing in the draft changes when one is
 /// marked; the scene that did not move still has this as a version to compare

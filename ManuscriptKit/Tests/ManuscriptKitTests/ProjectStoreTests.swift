@@ -180,6 +180,53 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+    @Test func removedScenesAreListedAndComeBackWhole() throws {
+        try withTemporaryDirectory { url in
+            let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
+            let a = try store.addChapter(title: "A", toPart: nil)
+            let a1 = try store.addScene(title: "A1", toChapter: a.id, text: "A1 text.\n", synopsis: "First.", notes: "Keep.")
+            let a2 = try store.addScene(title: "A2", toChapter: a.id, text: "A2 text.\n")
+            let b = try store.addChapter(title: "B", toPart: nil)
+            let b1 = try store.addScene(title: "B1", toChapter: b.id, text: "B1 text.\n")
+            let take = try store.saveTake(try store.createTake(for: a1.id, name: "Alt"), text: "Alt.\n")
+            #expect(try store.removedScenes().isEmpty)
+
+            try store.remove(scene: a1.id)
+            try store.checkpoint(a2.id, text: "A2 text, more.\n")
+            try store.remove(chapter: b.id)
+            let removed = try store.removedScenes()
+            #expect(removed.map(\.scene.id) == [b1.id, a1.id])
+            #expect(removed.map(\.chapterTitle) == ["B", "A"])
+            #expect(removed[1].scene.synopsis == "First.")
+            #expect(removed[0].date >= removed[1].date)
+
+            // Back into its chapter, same identity, and its take answers to it again.
+            let back = try store.restore(removed: removed[1])
+            #expect(back.id == a1.id)
+            #expect(back.synopsis == "First." && back.notes == "Keep.")
+            #expect(try store.sceneText(a1.id) == "A1 text.\n")
+            #expect(try store.manifest().chapter(a.id)?.scenes.map(\.id) == [a2.id, a1.id])
+            #expect(try store.takes(for: a1.id).map(\.id) == [take.id])
+            #expect(try store.repository.commit(try store.mainHead()).message == "Restore A1")
+            #expect(try store.removedScenes().map(\.scene.id) == [b1.id])
+
+            // Its chapter is gone, so it lands in the last one.
+            let b1Back = try store.restore(removed: try store.removedScenes()[0])
+            #expect(try store.manifest().chapter(containing: b1Back.id)?.id == a.id)
+            #expect(try store.removedScenes().isEmpty)
+            #expect(throws: ProjectStoreError.duplicateScene(a1.id)) {
+                try store.addScene(title: "Again", toChapter: nil, text: "", id: a1.id)
+            }
+
+            // Removed twice, listed once; a fresh store reads the same.
+            try store.remove(scene: a1.id)
+            #expect(try store.removedScenes().map(\.scene.id) == [a1.id])
+            let fresh = try ProjectStore.open(at: url, author: jane)
+            #expect(try fresh.removedScenes() == store.removedScenes())
+            #expect(try store.removedScenes(limit: 1).count == 1)
+        }
+    }
+
     @Test func removeDropsTheFilesAndKeepsTheHistory() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "P&P", author: jane)
