@@ -410,20 +410,27 @@ public final class ProjectStore {
 
     // MARK: - Backup
 
-    /// Everything a backup carries: main, the milestones, the takes and the
-    /// discarded takes. Main is not forced, so a remote that has moved on is
-    /// reported rather than overwritten.
-    public static let backupRefspecs = [
-        "refs/heads/main:refs/heads/main",
-        "refs/tags/milestones/*:refs/tags/milestones/*",
-        "refs/takes/*:refs/takes/*",
-        "refs/discarded/*:refs/discarded/*",
-    ]
+    /// Everything a backup carries besides main: the milestones, the takes
+    /// and the discarded takes.
+    public static let backupPrefixes = [milestonesPrefix, takesPrefix, discardedPrefix]
+
+    /// The refspecs a backup of the repository pushes, each ref named in
+    /// full, since libgit2 will not expand a glob on push. Main is not
+    /// forced, so a remote that has moved on is reported rather than
+    /// overwritten.
+    public static func backupRefspecs(of repository: Repository) throws -> [String] {
+        var refs = [mainRef]
+        for prefix in backupPrefixes {
+            refs += try repository.refs(withPrefix: prefix)
+        }
+        return refs.map { "\($0):\($0)" }
+    }
 
     /// Pushes the project to `url`. Opens its own repository so it can run
     /// on any thread while the store's own stays where it is.
     public static func backUp(projectAt folder: URL, to url: String, token: String?) throws {
-        try Repository.open(at: folder).push(to: url, refspecs: backupRefspecs, token: token)
+        let repository = try Repository.open(at: folder)
+        try repository.push(to: url, refspecs: try backupRefspecs(of: repository), token: token)
     }
 
     // MARK: - Since
