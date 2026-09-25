@@ -3,7 +3,8 @@ import Foundation
 /// The three emphasis forms prose Markdown uses, matched the same way in the
 /// editor (which keeps the markers, dimmed) and in exports (which drop them).
 public enum MarkdownEmphasis {
-    public static let bold = try! NSRegularExpression(pattern: #"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*"#)
+    // A lone star may sit inside, so `**a *b* c**` is bold around an italic.
+    public static let bold = try! NSRegularExpression(pattern: #"\*\*(?=\S)((?:[^*\n]|\*(?!\*))+?)(?<=\S)\*\*"#)
     public static let italic = try! NSRegularExpression(pattern: #"(?<!\*)\*(?=[^\s*])([^*\n]+?)(?<=\S)\*(?!\*)"#)
     // The sample scene marks italics with underscores, as much prose Markdown does.
     public static let underscoreItalic = try! NSRegularExpression(pattern: #"(?<![\w_])_(?=[^\s_])([^_\n]+?)(?<=\S)_(?![\w_])"#)
