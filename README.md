@@ -89,6 +89,12 @@ profile is made once with `xcrun notarytool store-credentials`.
 The icon is drawn by `scripts/icon.swift`; run it from the repository root
 after changing the drawing and the asset catalog is rewritten.
 
+For the Mac App Store, `scripts/appstore.sh` archives and exports a signed
+installer package, and with `UPLOAD=1` sends it to App Store Connect; the
+listing, privacy answers and review notes are in `docs/AppStore.md`, the
+privacy policy in `docs/Privacy.md`. `scripts/screenshot.swift` lays a
+window capture on a 2560×1600 canvas for the store.
+
 CI (`.github/workflows/ci.yml`) runs the package tests and a Release build
 on a macOS 26 runner for every push to main and every pull request.
 
