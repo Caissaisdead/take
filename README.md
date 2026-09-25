@@ -78,6 +78,20 @@ cd ManuscriptKit && swift test
 The tests shell out to `/usr/bin/git` to check that the system git reads
 what the app writes.
 
+### Releasing
+
+`scripts/release.sh` archives the Release build, signs it with the
+Developer ID, and zips it under `dist/`. With `NOTARY_PROFILE=Take` in the
+environment it also sends the zip to Apple's notary service, waits, and
+staples the ticket, so the app opens on any Mac without a warning. The
+profile is made once with `xcrun notarytool store-credentials`.
+
+The icon is drawn by `scripts/icon.swift`; run it from the repository root
+after changing the drawing and the asset catalog is rewritten.
+
+CI (`.github/workflows/ci.yml`) runs the package tests and a Release build
+on a macOS 26 runner for every push to main and every pull request.
+
 ### Bench
 
 Run the app with `-TakeBench` and it loads the sample scene and a 20k-word
