@@ -142,7 +142,7 @@ public enum ProseDiffer {
                 removed.append(oldParagraphs[index].text)
             case .inserted(let index):
                 inserted.append(newParagraphs[index].text)
-            case .equal(let index):
+            case .equal(let index, _):
                 flushHunk()
                 segments.append(.equal(oldParagraphs[index].text))
             }
@@ -202,24 +202,45 @@ public enum ProseDiffer {
         }
     }
 
+    /// A token compared without the whitespace that follows it, so a word
+    /// keeps its place when words are added after it. The text keeps the
+    /// whitespace, for laying the paragraph out again.
+    private struct Token: Equatable {
+        let text: String
+        let word: Substring
+
+        init(_ text: String) {
+            self.text = text
+            let end = text.lastIndex(where: { !$0.isWhitespace }).map { text.index(after: $0) } ?? text.startIndex
+            word = text[..<end]
+        }
+
+        static func == (lhs: Token, rhs: Token) -> Bool {
+            lhs.word == rhs.word
+        }
+    }
+
     private static func tokenDiff(old: [String], new: [String]) -> TokenDiff {
         var result = TokenDiff(oldCount: old.count, newCount: new.count)
-        walk(new.difference(from: old), old: old, new: new) { change in
+        let oldTokens = old.map(Token.init)
+        let newTokens = new.map(Token.init)
+        walk(newTokens.difference(from: oldTokens), old: oldTokens, new: newTokens) { change in
             switch change {
             case .removed(let index):
                 result.append(.removed(old[index]))
             case .inserted(let index):
                 result.append(.inserted(new[index]))
-            case .equal(let index):
+            case .equal(_, let index):
+                // The new side's text, so its spacing is what the paragraph shows.
                 result.equalCount += 1
-                result.append(.equal(old[index]))
+                result.append(.equal(new[index]))
             }
         }
         return result
     }
 
     private enum LinearChange {
-        case equal(oldIndex: Int)
+        case equal(oldIndex: Int, newIndex: Int)
         case removed(oldIndex: Int)
         case inserted(newIndex: Int)
     }
@@ -248,7 +269,7 @@ public enum ProseDiffer {
                 newIndex += 1
                 nextInsertion += 1
             } else {
-                emit(.equal(oldIndex: oldIndex))
+                emit(.equal(oldIndex: oldIndex, newIndex: newIndex))
                 oldIndex += 1
                 newIndex += 1
             }

@@ -200,7 +200,8 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             let gone = try store.addScene(title: "Gone", toChapter: a.id, text: "Five six.\n")
             let milestone = try store.milestone(named: "Draft")
 
-            try store.checkpoint(edited.id, text: "One two three four five six [[note]].\n")
+            // The differ keeps punctuation on its tokens, so the words go after the full stop.
+            try store.checkpoint(edited.id, text: "One two three four. Five six [[note]].\n")
             try store.remove(scene: gone.id)
             try store.rename(scene: same.id, to: "Same, renamed")
             let added = try store.addScene(title: "Added", toChapter: a.id, text: "Seven eight nine.\n")

@@ -173,7 +173,10 @@ import Testing
         #expect(ProseDiffer.wordDiff(old: "", new: "") == [])
         #expect(ProseDiffer.wordDiff(old: "", new: "a b") == [.inserted("a b")])
         #expect(ProseDiffer.wordDiff(old: "a b", new: "") == [.removed("a b")])
-        #expect(ProseDiffer.wordDiff(old: "a b", new: "a b c") == [.equal("a "), .removed("b"), .inserted("b c")])
+        // The last word keeps its place when words follow it: the space after
+        // it is the new side's, not a change.
+        #expect(ProseDiffer.wordDiff(old: "a b", new: "a b c") == [.equal("a b "), .inserted("c")])
+        #expect(ProseDiffer.wordDiff(old: "a b c", new: "a b") == [.equal("a b"), .removed("c")])
     }
 
     @Test func wordDiffRoundTrips() {
