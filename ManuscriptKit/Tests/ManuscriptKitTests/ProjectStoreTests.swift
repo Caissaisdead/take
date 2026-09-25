@@ -5,10 +5,19 @@ import Testing
 private let opening = "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.\n\nHowever little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families.\n"
 
 /// Runs the system git in `directory` and returns everything it printed.
+private struct GitFailed: Error, CustomStringConvertible {
+    var arguments: [String]
+    var output: String
+    var description: String { "git \(arguments.joined(separator: " ")): \(output)" }
+}
+
+/// Runs the system git in `directory` with whatever hooks the Mac has turned
+/// off, and fails when git does, so a command that did nothing cannot pass
+/// for one that did.
 private func git(_ arguments: String..., in directory: URL) throws -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-    process.arguments = arguments
+    process.arguments = ["-c", "core.hooksPath=/dev/null"] + arguments
     process.currentDirectoryURL = directory
     let pipe = Pipe()
     process.standardOutput = pipe
@@ -16,7 +25,9 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
     try process.run()
     let output = pipe.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
-    return String(decoding: output, as: UTF8.self)
+    let text = String(decoding: output, as: UTF8.self)
+    guard process.terminationStatus == 0 else { throw GitFailed(arguments: arguments, output: text) }
+    return text
 }
 
 @Suite struct ProjectStoreTests {
