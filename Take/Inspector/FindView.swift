@@ -138,6 +138,6 @@ private struct MatchRow: View {
         var after = String(text[upper...])
         if before.count > 60 { before = "…" + String(before.suffix(60)) }
         if after.count > 100 { after = String(after.prefix(100)) + "…" }
-        return Text(before) + Text(text[lower..<upper]).bold() + Text(after)
+        return Text("\(before)\(Text(text[lower..<upper]).bold())\(after)")
     }
 }
