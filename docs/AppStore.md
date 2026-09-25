@@ -110,14 +110,21 @@ entitlement.
 ## Screenshots
 
 Mac screenshots must be 16:10, one of 1280×800, 1440×900, 2560×1600 or
-2880×1800, and at least one is required. Suggested set, in order:
+2880×1800, and at least one is required. The set, in order:
 
 1. The sample project open: binder, a scene in the editor, inspector.
-2. A scene with two takes in the inspector, one selected.
+2. A scene with its takes in the inspector, one selected.
 3. Compare, with a paragraph link showing.
 4. The chapter map with takes on the spine.
 5. Since, after a milestone.
 6. Settings, the Accent choice.
+
+They are made without a hand on the mouse: `-TakeShot <pose>` on the
+command line opens the sample and poses the window (`take`, `compare`,
+`map`, `since`, `settings`; no pose for the first), a window capture is
+taken with `screencapture -l`, and `scripts/screenshot.swift` lays it on
+the store canvas. The window is 1152×720 points so the capture is 2304×1440
+and sits on the 2560×1600 canvas unscaled.
 
 ## Open decisions before submission
 

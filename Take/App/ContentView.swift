@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var compareRefresh: Task<Void, Never>?
     @State private var confirmDiscard = false
     @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         @Bindable var model = model
@@ -185,6 +186,7 @@ struct ContentView: View {
                 compareDiff = model.compare()
             }
         }
+        .task { await pose() }
         .tint((Accent(rawValue: accentName) ?? .blue).color)
         .frame(minWidth: 900, minHeight: 560)
         .navigationTitle(model.projectName)
@@ -193,6 +195,30 @@ struct ContentView: View {
 
     private var comparing: Bool {
         showInspector && inspectorTab == .compare
+    }
+
+    /// Puts the window in the state a store screenshot wants, for `-TakeShot`.
+    private func pose() async {
+        guard let pose = ProjectModel.shotPose else { return }
+        try? await Task.sleep(for: .milliseconds(800))
+        switch pose {
+        case "take":
+            if let take = model.takes.first { model.select(.take(take)) }
+        case "compare":
+            if let take = model.takes.first { model.select(.take(take)) }
+            inspectorTab = .compare
+            showInspector = true
+        case "map":
+            showInspector = false
+            detail = .map
+        case "since":
+            showInspector = false
+            detail = .since
+        case "settings":
+            openSettings()
+        default:
+            break
+        }
     }
 
     /// A toolbar toggle for one detail mode; off means the editor.

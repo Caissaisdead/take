@@ -123,8 +123,8 @@ final class ProjectModel {
     @ObservationIgnored private var scopedURL: URL?
 
     init() {
-        // Bench runs always use the sample; otherwise the last project, else the sample.
-        if !Self.isBenchRequested, let url = Self.lastProjectURL() {
+        // Bench runs and poses always use the sample; otherwise the last project, else the sample.
+        if !Self.isBenchRequested, Self.shotPose == nil, let url = Self.lastProjectURL() {
             open(url)
         }
         if store == nil {
@@ -1314,6 +1314,11 @@ final class ProjectModel {
     }
 
     static let isBenchRequested = CommandLine.arguments.contains("-TakeBench") || UserDefaults.standard.bool(forKey: "TakeBench")
+
+    /// With `-TakeShot <pose>` on the command line the app opens the sample
+    /// and poses for a store screenshot: `take`, `compare`, `map`, `since` or
+    /// `settings`. Nothing is saved.
+    static let shotPose: String? = UserDefaults.standard.string(forKey: "TakeShot")
 
     static var benchFile: URL {
         sampleFolder.deletingLastPathComponent().appendingPathComponent("bench.json")
