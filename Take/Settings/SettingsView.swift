@@ -9,13 +9,41 @@ struct SettingsView: View {
     @State private var remote = ""
     @State private var token = ""
     @State private var hasToken = KeychainItem.backupToken.read() != nil
-    @State private var model = ClaudeClient.model
+    @State private var claudeModel = ClaudeClient.model
     @State private var check = ""
     @State private var checking = false
     @AppStorage(ConsentGate.alwaysAskKey) private var alwaysAsk = true
+    @AppStorage(Accent.key) private var accentName = Accent.blue.rawValue
 
     var body: some View {
         Form {
+            Section {
+                HStack(spacing: 10) {
+                    ForEach(Accent.allCases) { accent in
+                        Button {
+                            accentName = accent.rawValue
+                        } label: {
+                            ZStack {
+                                Circle().fill(accent.color).frame(width: 24, height: 24)
+                                if accent.rawValue == accentName {
+                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help(accent.name)
+                        .accessibilityLabel(accent.name)
+                    }
+                    Spacer()
+                    Text((Accent(rawValue: accentName) ?? .blue).name)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Accent")
+            } footer: {
+                Text("The colour of controls, selections and live takes. Yours on this Mac; never part of a project.")
+            }
+
             Section {
                 HStack {
                     SecureField("sk-ant-…", text: $key)
@@ -38,12 +66,12 @@ struct SettingsView: View {
                         .controlSize(.small)
                     }
                 }
-                Picker("Model", selection: $model) {
+                Picker("Model", selection: $claudeModel) {
                     ForEach(ClaudeClient.models, id: \.id) { entry in
                         Text(entry.name).tag(entry.id)
                     }
                 }
-                .onChange(of: model) { _, chosen in
+                .onChange(of: claudeModel) { _, chosen in
                     UserDefaults.standard.set(chosen, forKey: ClaudeClient.modelKey)
                 }
                 HStack {
