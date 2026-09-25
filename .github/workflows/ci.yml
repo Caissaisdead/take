@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test ManuscriptKit
+        working-directory: ManuscriptKit
+        run: swift test
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Build Take
+        run: |
+          xcodegen generate
+          xcodebuild -project Take.xcodeproj -scheme Take -configuration Release build CODE_SIGNING_ALLOWED=NO -quiet
