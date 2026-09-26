@@ -48,7 +48,12 @@ struct ContentView: View {
             case .editor:
                 DetailView()
             case .map:
-                MapView()
+                MapView { scene, base in
+                    model.compare(scene, against: base)
+                    detail = .editor
+                    inspectorTab = .compare
+                    showInspector = true
+                }
             case .since:
                 ChangesView { scene, milestone in
                     model.open(scene, against: milestone)

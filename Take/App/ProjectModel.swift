@@ -771,18 +771,43 @@ final class ProjectModel {
         var saves: Int
         /// The scene's synopsis, on main's node only.
         var synopsis = ""
+        /// For a take: the bead on the scene's line it was begun from, or nil
+        /// when that save is older than the line shows.
+        var baseRow: Int?
+        /// For a take: main's saves of the scene since the take was begun.
+        var mainSavesSince = 0
 
-        static func == (lhs: MapNode, rhs: MapNode) -> Bool { lhs.id == rhs.id && lhs.words == rhs.words && lhs.saves == rhs.saves && lhs.synopsis == rhs.synopsis }
+        static func == (lhs: MapNode, rhs: MapNode) -> Bool {
+            lhs.id == rhs.id && lhs.words == rhs.words && lhs.saves == rhs.saves && lhs.synopsis == rhs.synopsis
+                && lhs.baseRow == rhs.baseRow && lhs.mainSavesSince == rhs.mainSavesSince
+        }
         func hash(into hasher: inout Hasher) { hasher.combine(id) }
     }
 
-    /// A scene on the map: main on the line, its takes hanging below.
+    /// One save of a scene on the map's line, with the milestones that mark
+    /// the draft as it had the scene then.
+    struct MapBead: Identifiable, Hashable {
+        var id: ObjectID
+        var message: String
+        var date: Date
+        var isKeep: Bool
+        var milestones: [Milestone]
+    }
+
+    /// A scene on the map: its saves on a line, oldest first, main's head
+    /// last; its takes hanging off the beads they were begun from.
     struct MapColumn: Identifiable {
         var id: SceneID { scene.id }
         var scene: SceneRef
         var main: MapNode
         var takes: [MapNode]
+        var beads: [MapBead]
+        /// True when the line was cut short and older saves exist.
+        var earlier: Bool
     }
+
+    /// Saves per scene the map draws before it stops looking back.
+    static let mapHistoryLimit = 40
 
     /// Bumped by every refresh, so the map knows when to rebuild.
     private(set) var mapVersion = 0
@@ -799,19 +824,44 @@ final class ProjectModel {
     /// not on every keystroke.
     func chapterMap(_ chapterID: UUID) -> [MapColumn] {
         guard let store, let chapter = manuscript.chapter(chapterID) else { return [] }
+        let repository = store.repository
         var columns: [MapColumn] = []
         for scene in chapter.scenes {
             do {
                 let mainText = try store.sceneText(scene.id)
                 let main = MapNode(id: "main:\(scene.id.uuid.uuidString)", kind: .main, title: scene.title, words: Prose.wordCount(Prose.withoutNotes(mainText)), delta: nil, saves: 0, synopsis: scene.synopsis)
+
+                // The line: the scene's saves, oldest first, each with the
+                // text it left, so a milestone or a take's base finds its bead
+                // by the text rather than by a commit that may be another scene's.
+                let versions = try store.history(of: scene.id, limit: Self.mapHistoryLimit)
+                var beads: [MapBead] = []
+                var blobs: [ObjectID?] = []
+                for version in versions.reversed() {
+                    beads.append(MapBead(id: version.id, message: version.message, date: version.date, isKeep: version.kind == .keep, milestones: []))
+                    blobs.append(try repository.entry(atPath: scene.path, inTree: try repository.commit(version.id).tree)?.id)
+                }
+                func blob(at commit: ObjectID) throws -> ObjectID? {
+                    try repository.entry(atPath: scene.path, inTree: try repository.commit(commit).tree)?.id
+                }
+                for milestone in milestones {
+                    guard let blob = try blob(at: milestone.commit),
+                          let row = blobs.indices.last(where: { blobs[$0] == blob && beads[$0].date <= milestone.date }) else { continue }
+                    beads[row].milestones.append(milestone)
+                }
+                func row(of take: Take) throws -> Int? {
+                    guard let blob = try blob(at: take.base) else { return nil }
+                    return blobs.lastIndex(of: blob)
+                }
+
                 var takes: [MapNode] = []
                 for take in try store.takes(for: scene.id) {
-                    takes.append(try node(for: take, against: mainText, discarded: false))
+                    takes.append(try node(for: take, against: mainText, discarded: false, row: try row(of: take), beads: beads.count))
                 }
                 for take in try store.discardedTakes(for: scene.id) {
-                    takes.append(try node(for: take, against: mainText, discarded: true))
+                    takes.append(try node(for: take, against: mainText, discarded: true, row: try row(of: take), beads: beads.count))
                 }
-                columns.append(MapColumn(scene: scene, main: main, takes: takes))
+                columns.append(MapColumn(scene: scene, main: main, takes: takes, beads: beads, earlier: versions.count >= Self.mapHistoryLimit))
             } catch {
                 statusLine = "Map failed: \(error.localizedDescription)"
             }
@@ -819,7 +869,7 @@ final class ProjectModel {
         return columns
     }
 
-    private func node(for take: Take, against mainText: String, discarded: Bool) throws -> MapNode {
+    private func node(for take: Take, against mainText: String, discarded: Bool, row: Int?, beads: Int) throws -> MapNode {
         guard let store else { throw ProjectStoreError.unbornMain }
         let text = try store.takeText(take)
         let summary = ProseDiffer.diff(old: mainText, new: text).summary
@@ -830,7 +880,9 @@ final class ProjectModel {
             title: take.name,
             words: Prose.wordCount(Prose.withoutNotes(text)),
             delta: (summary.wordsAdded, summary.wordsRemoved),
-            saves: saves)
+            saves: saves,
+            baseRow: row,
+            mainSavesSince: row.map { beads - 1 - $0 } ?? beads)
     }
 
     /// Opens what a map node stands for. A discarded take only reports itself.
@@ -1213,9 +1265,14 @@ final class ProjectModel {
 
     /// Opens the scene on main, compared against the milestone.
     func open(_ scene: SceneID, against milestone: Milestone) {
+        compare(scene, against: .milestone(milestone.id))
+    }
+
+    /// Opens the scene on main, compared against `base`.
+    func compare(_ scene: SceneID, against base: CompareBase) {
         select(.main(scene))
         guard selection == .main(scene) else { return }
-        compareBase = .milestone(milestone.id)
+        compareBase = base
     }
 
     /// Takes the compared side of one paragraph into the editor: a changed

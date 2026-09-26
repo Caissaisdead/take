@@ -35,8 +35,10 @@ What goes into the App Store Connect record, and what is left to decide.
     into the draft one paragraph at a time.
 
     Mark milestones and see, scene by scene, what has moved since. Map a
-    chapter as its scenes in a line with every take beneath. Search the
-    whole draft. Keep notes in the prose that never reach the page.
+    chapter with time running down the page: every save of every scene,
+    milestones flagged, and each take hanging off the save it was begun
+    from, so you see how far the draft moved beneath it. Search the whole
+    draft. Keep notes in the prose that never reach the page.
 
     Counts and targets: words per chapter and for the whole, today's words,
     a target for the day and for the book.
@@ -115,7 +117,8 @@ Mac screenshots must be 16:10, one of 1280×800, 1440×900, 2560×1600 or
 1. The sample project open: binder, a scene in the editor, inspector.
 2. A scene with its takes in the inspector, one selected.
 3. Compare, with a paragraph link showing.
-4. The chapter map with takes on the spine.
+4. The chapter map: each scene's saves down the page, takes hanging off
+   the saves they were begun from.
 5. Since, after a milestone.
 6. Settings, the Accent choice.
 

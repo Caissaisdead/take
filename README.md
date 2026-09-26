@@ -27,8 +27,11 @@ written side by side, then kept or discarded.
   main a paragraph at a time.
 - **Since** lists every scene against a milestone: the words that came and
   went, the scenes added and gone.
-- **The map** draws a chapter as its scenes in a line with every take
-  beneath.
+- **The map** draws a chapter with time running down the page: each scene
+  is a line of its saves, milestones flagged on the saves they mark, and
+  every take hangs off the save it was begun from, so how far main has
+  moved beneath a take is in view before a Keep. A save opens the scene
+  compared against it; a take opens the take.
 - **Each scene has a synopsis and notes**, kept in the manifest, shown in
   the binder and on the map, and handed to the engines. `[[A note]]` in the
   prose is dimmed on the page, listed in the Scene pane, and never exported.
