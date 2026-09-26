@@ -28,9 +28,9 @@ pkgutil --check-signature "$dist/appstore/Take.pkg" | head -3
 echo "wrote $dist/appstore/Take.pkg"
 
 if [[ "${UPLOAD:-0}" = "1" ]]; then
-    options=$(mktemp -t take-upload).plist
-    sed 's|<string>export</string>|<string>upload</string>|' scripts/ExportOptions-AppStore.plist > "$options"
+    plist=$(mktemp -t take-upload).plist
+    sed 's|<string>export</string>|<string>upload</string>|' scripts/ExportOptions-AppStore.plist > "$plist"
     xcodebuild -exportArchive -archivePath "$archive" \
-        -exportOptionsPlist "$options" -exportPath "$dist/upload" -allowProvisioningUpdates
+        -exportOptionsPlist "$plist" -exportPath "$dist/upload" -allowProvisioningUpdates
     echo "uploaded $version ($build) to App Store Connect"
 fi
