@@ -109,6 +109,79 @@ entitlement.
     Export compliance: the app uses only the system's TLS (URLSession),
     which is exempt.
 
+## Review reply (2026-10-06)
+
+The first submission came back under Guideline 2.1, Information Needed,
+the questionnaire Apple sends a developer account with little review
+history. The answer below went into the Resolution Center reply and into
+the Notes field, with the recording attached to both.
+`scripts/record.sh` makes the recording: a fresh sample, the app launched
+and driven through its typical flow by `scripts/tour.applescript`.
+
+    1. Screen recording
+
+    Attached: Take-0.1-review-recording.mov, captured on a MacBook Air
+    (M3) running macOS 27.0 (26A428). It starts with the app launching
+    and shows the typical flow: editing a scene and saving; starting a
+    take of the scene, rewriting its opening, comparing it with the
+    draft, keeping it; marking a milestone; editing a second scene;
+    Since (every scene against the milestone); the chapter map; Find
+    in Draft; Untangle, which runs Apple's on-device model; Three Takes
+    declining because no API key is set; Settings, with the empty key
+    field; and Export as PDF. There is no account, registration, login
+    or deletion flow, no user-generated content shared with anyone, and
+    nothing to buy.
+
+    2. Purpose and audience
+
+    Take is for novelists and other long-form fiction writers. The
+    problem it solves: alternate versions of a scene get lost in copied
+    files and "v2" documents. Take keeps alternate versions ("takes")
+    of each scene side by side with the draft, with the full history of
+    every save, and lets the writer compare, keep, discard and restore
+    them. The manuscript is a folder of Markdown files with a git
+    repository inside it, on the writer's own Mac. There is no account
+    and no server.
+
+    3. Setup and access
+
+    Nothing to set up. On first launch the app opens a sample project
+    (public-domain text, Pride and Prejudice); File > Open Sample
+    Project reopens it at any time. Select a scene in the sidebar,
+    edit, Command-S to save. Take > New Take starts an alternate
+    version; Keep and Discard are in the toolbar; Compare (Shift-
+    Command-D) shows the difference; Option-Command-M opens the chapter
+    map; Draft > Mark Milestone and Option-Command-S show what moved
+    since. No login is required anywhere. Two optional features take
+    credentials the writer enters in Settings: Three Takes needs the
+    writer's own Anthropic API key, and Draft > Back Up needs the URL
+    and access token of a git remote the writer chooses. The app is
+    complete without either.
+
+    4. External services
+
+    None are required. Optional, each under credentials the writer
+    enters and only when the writer invokes the feature:
+    - Anthropic API (api.anthropic.com), for Three Takes, with the
+      writer's own API key.
+    - A git remote the writer names (for example GitHub), for Back Up,
+      with the writer's own token.
+    Untangle uses Apple's on-device Foundation Models framework (Apple
+    Intelligence) and sends nothing off the Mac. Export uses system
+    frameworks. The app has no analytics, no crash reporting and no
+    third-party SDKs; git operations use libgit2, compiled into the app.
+
+    5. Regional differences
+
+    None. The app behaves the same in every region. It is in English
+    (U.S.) only and has no region-gated features or content.
+
+    6. Regulated industry and third-party material
+
+    Not applicable. The only third-party text in the app is the sample
+    project, Jane Austen's Pride and Prejudice (1813), which is in the
+    public domain.
+
 ## Screenshots
 
 Mac screenshots must be 16:10, one of 1280×800, 1440×900, 2560×1600 or
