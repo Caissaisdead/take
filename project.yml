@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.siddharthnigam
   deploymentTarget:
     macOS: "26.0"
+    iOS: "26.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
@@ -56,10 +57,55 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES
 
+  TakeMobile:
+    type: application
+    platform: iOS
+    sources:
+      - path: Shared
+        excludes:
+          - "Sample/**"
+      - path: Shared/Sample
+        buildPhase: resources
+        type: folder
+      - path: TakeMobile
+    dependencies:
+      - package: ManuscriptKit
+        product: ManuscriptKit
+    info:
+      path: TakeMobile/Info.plist
+      properties:
+        CFBundleDisplayName: Take
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: "© 2026 Siddharth Nigam"
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arm64]
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siddharthnigam.take
+        PRODUCT_NAME: Take
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+
 schemes:
   Take:
     build:
       targets:
         Take: all
+    run:
+      config: Debug
+  TakeMobile:
+    build:
+      targets:
+        TakeMobile: all
     run:
       config: Debug

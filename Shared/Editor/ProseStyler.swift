@@ -2,9 +2,11 @@ import ManuscriptKit
 #if canImport(UIKit)
 import UIKit
 typealias PlatformFont = UIFont
+typealias EditActions = NSTextStorage.EditActions
 #else
 import AppKit
 typealias PlatformFont = NSFont
+typealias EditActions = NSTextStorageEditActions
 #endif
 
 /// The look of prose in the editor and the compare pane: one serif face, one
@@ -96,7 +98,7 @@ final class ProseStyler: NSObject, @MainActor NSTextStorageDelegate {
     private let underscoreItalic = MarkdownEmphasis.underscoreItalic
     private let note = Prose.notePattern
 
-    func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
+    func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: EditActions, range editedRange: NSRange, changeInLength delta: Int) {
         // Attribute-only edits are our own; restyling them again would loop.
         guard !isSuspended, editedMask.contains(.editedCharacters) else { return }
         restyle(storage, in: editedRange)

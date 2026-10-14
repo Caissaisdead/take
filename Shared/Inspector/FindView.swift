@@ -21,7 +21,9 @@ struct FindView: View {
                     .onSubmit(run)
                 HStack {
                     Toggle("Takes too", isOn: $includeTakes)
+                        #if os(macOS)
                         .toggleStyle(.checkbox)
+                        #endif
                         .font(.caption)
                     Spacer()
                     Text(summary)

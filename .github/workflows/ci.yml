@@ -22,3 +22,10 @@ jobs:
         run: |
           xcodegen generate
           xcodebuild -project Take.xcodeproj -scheme Take -configuration Release build CODE_SIGNING_ALLOWED=NO -quiet
+
+      - name: Build Take for iPhone
+        run: xcodebuild -project Take.xcodeproj -scheme TakeMobile -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO -quiet
+
+      - name: Test ManuscriptKit on the iPhone simulator
+        working-directory: ManuscriptKit
+        run: xcodebuild test -scheme ManuscriptKit -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -quiet
