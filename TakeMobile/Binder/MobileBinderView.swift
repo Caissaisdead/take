@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import ManuscriptKit
 
 /// The manuscript as a list: chapters as sections, parts as larger headers
@@ -11,6 +12,8 @@ struct MobileBinderView: View {
     @State private var moving: SceneRef?
     @State private var showTargets = false
     @State private var showFind = false
+    @State private var showSettings = false
+    @State private var exporting: ProjectModel.ExportDocument?
 
     var body: some View {
         List {
@@ -36,6 +39,10 @@ struct MobileBinderView: View {
                                     Button("New Scene After…", systemImage: "plus") { model.naming = .scene(chapter: nil, after: scene.id) }
                                     Button("Move…", systemImage: "arrow.up.arrow.down") { moving = scene }
                                     Button("Rename…", systemImage: "pencil") { model.naming = .rename(.scene(scene.id)) }
+                                    Menu("Export Chapter") {
+                                        Button("Markdown…") { exporting = model.exportDocument(.markdown, chapter: chapter.id) }
+                                        Button("PDF…") { exporting = model.exportDocument(.pdf, chapter: chapter.id) }
+                                    }
                                     Divider()
                                     Button("Remove", systemImage: "trash", role: .destructive) { removing = .scene(scene.id) }
                                 }
@@ -46,7 +53,7 @@ struct MobileBinderView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     } header: {
-                        ChapterHeader(chapter: chapter, words: model.words(in: chapter), removing: $removing)
+                        ChapterHeader(chapter: chapter, words: model.words(in: chapter), removing: $removing, exporting: $exporting)
                     }
                 }
             }
@@ -89,13 +96,32 @@ struct MobileBinderView: View {
                         .disabled(model.backupRemote.isEmpty || model.isPulling || model.isBackingUp)
                     Button("Back Up", systemImage: "icloud.and.arrow.up") { model.backUp() }
                         .disabled(model.backupRemote.isEmpty || model.isPulling || model.isBackingUp)
+                    Divider()
+                    Button("Project Settings…", systemImage: "gearshape") { showSettings = true }
                 }
             }
         }
         .namePrompt()
         .sheet(isPresented: $showTargets) { MobileTargetsSheet() }
         .sheet(isPresented: $showFind) { FindSheet(path: $path) }
-        .onAppear { if ProjectModel.shotPose == "find" { showFind = true } }
+        .sheet(isPresented: $showSettings) {
+            ProjectSettingsSheet(export: { exporting = model.exportDocument($0) }, removed: { path = [] })
+        }
+        .fileExporter(
+            isPresented: Binding(get: { exporting != nil }, set: { if !$0 { exporting = nil } }),
+            document: exporting.map(ExportedFile.init),
+            contentType: exporting?.kind == .pdf ? .pdf : (UTType("net.daringfireball.markdown") ?? .plainText),
+            defaultFilename: exporting?.name
+        ) { result in
+            switch result {
+            case .success(let url): model.statusLine = "Exported to \(url.lastPathComponent)"
+            case .failure(let error): model.statusLine = "Export failed: \(error.localizedDescription)"
+            }
+        }
+        .onAppear {
+            if ProjectModel.shotPose == "find" { showFind = true }
+            if ProjectModel.shotPose == "settings" { showSettings = true }
+        }
         .sheet(item: $moving) { scene in MoveSheet(scene: scene) }
         .sheet(isPresented: Binding(get: { model.pullDivergence != nil }, set: { if !$0 { model.decidePullLater() } })) {
             PullConflictSheet()
@@ -163,6 +189,7 @@ private struct ChapterHeader: View {
     let chapter: Chapter
     let words: Int
     @Binding var removing: ProjectModel.BinderItem?
+    @Binding var exporting: ProjectModel.ExportDocument?
 
     var body: some View {
         HStack {
@@ -182,6 +209,10 @@ private struct ChapterHeader: View {
                             Button(part.title.isEmpty ? "Untitled Part" : part.title) { model.move(chapter: chapter.id, toPart: part.id) }
                         }
                     }
+                }
+                Menu("Export Chapter") {
+                    Button("Markdown…") { exporting = model.exportDocument(.markdown, chapter: chapter.id) }
+                    Button("PDF…") { exporting = model.exportDocument(.pdf, chapter: chapter.id) }
                 }
                 Divider()
                 Button("Remove Chapter", role: .destructive) { removing = .chapter(chapter.id) }

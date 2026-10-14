@@ -12,7 +12,7 @@ enum PDFWriter {
     }
 
     static func data(for manuscript: Manuscript, text: (SceneID) throws -> String) throws -> Data {
-        let document = try DocxWriter.attributedString(for: manuscript, text: text)
+        let document = try ManuscriptLayout.attributedString(for: manuscript, text: text)
 
         let info = NSPrintInfo()
         info.paperSize = NSSize(width: 612, height: 792)

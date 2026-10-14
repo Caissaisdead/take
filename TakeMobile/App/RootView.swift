@@ -66,7 +66,7 @@ struct RootView: View {
         switch pose {
         case "projects":
             path = []
-        case "binder":
+        case "binder", "settings":
             path = [.project(sample.id)]
         case "map":
             path = [.project(sample.id), .map]

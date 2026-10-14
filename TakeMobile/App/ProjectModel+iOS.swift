@@ -83,3 +83,30 @@ extension ProjectModel {
         select(.main(scene.id))
     }
 }
+
+extension ProjectModel {
+    /// What an export hands to the Files app.
+    struct ExportDocument {
+        let name: String
+        let data: Data
+        let kind: Kind
+        enum Kind { case markdown, pdf }
+    }
+
+    /// The draft, or one chapter, as one Markdown file or a PDF.
+    func exportDocument(_ kind: ExportDocument.Kind, chapter: UUID? = nil) -> ExportDocument? {
+        guard let cut = exportCut(chapter: chapter) else { return nil }
+        do {
+            switch kind {
+            case .markdown:
+                let text = try MarkdownExport.combined(cut.manuscript, text: cut.text)
+                return ExportDocument(name: cut.name, data: Data(text.utf8), kind: .markdown)
+            case .pdf:
+                return ExportDocument(name: cut.name, data: try PDFRenderer.data(for: cut.manuscript, text: cut.text), kind: .pdf)
+            }
+        } catch {
+            statusLine = "Export failed: \(error.localizedDescription)"
+            return nil
+        }
+    }
+}
