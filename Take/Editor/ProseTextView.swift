@@ -1,121 +1,10 @@
 import AppKit
 import ManuscriptKit
 
-/// The look of prose in the editor and the compare pane: one serif face, one
-/// measure, so both read as the same text.
-@MainActor
-enum ProseStyle {
-    static let size: CGFloat = 17
-
-    static let font: NSFont = {
-        let system = NSFont.systemFont(ofSize: size)
-        guard let serif = system.fontDescriptor.withDesign(.serif),
-              let font = NSFont(descriptor: serif, size: size) else { return system }
-        return font
-    }()
-
-    static let italic = font.withTrait(.italic)
-    static let bold = font.withTrait(.bold)
-
-    static let paragraph = makeParagraphStyle(alignment: .natural)
-    static let centred = makeParagraphStyle(alignment: .center)
-
-    static let base: [NSAttributedString.Key: Any] = [
-        .font: font,
-        .foregroundColor: NSColor.labelColor,
-        .paragraphStyle: paragraph,
-    ]
-
-    private static func makeParagraphStyle(alignment: NSTextAlignment) -> NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = 1.5
-        style.paragraphSpacing = 14
-        style.alignment = alignment
-        return style
-    }
-}
-
-private extension NSFont {
-    func withTrait(_ trait: NSFontDescriptor.SymbolicTraits) -> NSFont {
-        let descriptor = fontDescriptor.withSymbolicTraits(fontDescriptor.symbolicTraits.union(trait))
-        return NSFont(descriptor: descriptor, size: pointSize) ?? self
-    }
-}
-
-extension Duration {
-    var milliseconds: Double {
-        Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15
-    }
-}
-
-/// Restyles only the paragraphs an edit touched, so a keystroke in a 20k-word
-/// scene never pays for the whole document. Attributes are reset to the base and
-/// the Markdown emphasis markers re-read on each pass; nothing is cached.
-@MainActor
-final class ProseStyler: NSObject, @MainActor NSTextStorageDelegate {
-    /// Set while `ProseTextView.setText` replaces the document, which restyles
-    /// the whole thing once itself.
-    var isSuspended = false
-
-    private let bold = MarkdownEmphasis.bold
-    private let italic = MarkdownEmphasis.italic
-    private let underscoreItalic = MarkdownEmphasis.underscoreItalic
-    private let note = Prose.notePattern
-
-    func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
-        // Attribute-only edits are our own; restyling them again would loop.
-        guard !isSuspended, editedMask.contains(.editedCharacters) else { return }
-        restyle(storage, in: editedRange)
-    }
-
-    func restyle(_ storage: NSTextStorage, in range: NSRange) {
-        let text = storage.mutableString
-        let paragraphs = text.paragraphRange(for: range)
-        storage.setAttributes(ProseStyle.base, range: paragraphs)
-        text.enumerateSubstrings(in: paragraphs, options: [.byParagraphs, .substringNotRequired]) { _, body, enclosing, _ in
-            self.style(paragraph: body, enclosing: enclosing, in: storage)
-        }
-    }
-
-    private func style(paragraph: NSRange, enclosing: NSRange, in storage: NSTextStorage) {
-        let text = storage.mutableString.substring(with: paragraph)
-        if MarkdownEmphasis.isSceneBreak(text) {
-            storage.addAttributes([.paragraphStyle: ProseStyle.centred, .foregroundColor: NSColor.tertiaryLabelColor], range: enclosing)
-            return
-        }
-        apply(bold, font: ProseStyle.bold, to: text, offset: paragraph.location, in: storage)
-        apply(italic, font: ProseStyle.italic, to: text, offset: paragraph.location, in: storage)
-        apply(underscoreItalic, font: ProseStyle.italic, to: text, offset: paragraph.location, in: storage)
-        // A writer's note, brackets and all, steps back from the prose.
-        let whole = NSRange(location: 0, length: (text as NSString).length)
-        for match in note.matches(in: text, range: whole) {
-            storage.addAttributes([.font: ProseStyle.italic, .foregroundColor: NSColor.tertiaryLabelColor], range: shifted(match.range, by: paragraph.location))
-        }
-    }
-
-    private func apply(_ pattern: NSRegularExpression, font: NSFont, to text: String, offset: Int, in storage: NSTextStorage) {
-        let whole = NSRange(location: 0, length: (text as NSString).length)
-        for match in pattern.matches(in: text, range: whole) {
-            let outer = match.range
-            let inner = match.range(at: 1)
-            let opening = NSRange(location: outer.location, length: inner.location - outer.location)
-            let closing = NSRange(location: inner.location + inner.length, length: outer.location + outer.length - inner.location - inner.length)
-            storage.addAttribute(.font, value: font, range: shifted(inner, by: offset))
-            for marker in [opening, closing] {
-                storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: shifted(marker, by: offset))
-            }
-        }
-    }
-
-    private func shifted(_ range: NSRange, by offset: Int) -> NSRange {
-        NSRange(location: range.location + offset, length: range.length)
-    }
-}
-
 /// The scene editor: an NSTextView on TextKit 2. `layoutManager` is never read
 /// here or anywhere else, because reading it silently rebuilds the view on
 /// TextKit 1.
-final class ProseTextView: NSTextView {
+final class ProseTextView: NSTextView, EditorHost {
     /// Fired from `didChangeText` for user edits only, never for `setText`. No
     /// payload: reading `string` bridges the whole document, and a keystroke
     /// must not cost the document's length.
@@ -162,8 +51,17 @@ final class ProseTextView: NSTextView {
 
     /// The caret and the selection in the writer's accent.
     func apply(_ accent: Accent) {
-        insertionPointColor = accent.nsColor
-        selectedTextAttributes = [.backgroundColor: accent.nsColor.withAlphaComponent(0.22)]
+        insertionPointColor = accent.platformColor
+        selectedTextAttributes = [.backgroundColor: accent.platformColor.withAlphaComponent(0.22)]
+    }
+
+    // MARK: - EditorHost
+
+    var currentText: String { string }
+
+    func reveal(_ range: NSRange) {
+        show(range)
+        window?.makeFirstResponder(self)
     }
 
     /// Replaces the whole document, restyles it once and reports the time taken,

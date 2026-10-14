@@ -1,5 +1,9 @@
-import AppKit
 import ManuscriptKit
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 
 /// Turns a `ProseDiff` into styled text for the compare pane. Paragraphs sit a
 /// blank line apart; whole-paragraph changes colour the paragraph, in-place
@@ -18,10 +22,10 @@ enum DiffRenderer {
     static func render(_ diff: ProseDiff, accent: Accent = .blue) -> NSAttributedString {
         let out = NSMutableAttributedString()
         for (index, segment) in diff.segments.enumerated() {
-            if index > 0 { out.append(run("\n\n", color: .labelColor)) }
+            if index > 0 { out.append(run("\n\n", color: ProseStyle.labelColor)) }
             switch segment {
             case .equal(let paragraph):
-                out.append(run(paragraph, color: .secondaryLabelColor))
+                out.append(run(paragraph, color: ProseStyle.secondaryColor))
             case .removed(let paragraph):
                 out.append(run(paragraph, color: .systemRed, decoration: .strikethroughStyle))
                 out.append(pick("bring back", segment: index, accent: accent))
@@ -32,7 +36,7 @@ enum DiffRenderer {
                 for word in words {
                     switch word {
                     case .equal(let token):
-                        out.append(run(token, color: .labelColor))
+                        out.append(run(token, color: ProseStyle.labelColor))
                     case .removed(let token):
                         out.append(run(token, color: .systemRed, decoration: .strikethroughStyle))
                     case .inserted(let token):
@@ -48,8 +52,8 @@ enum DiffRenderer {
     /// A small link after a paragraph: what taking the other side would do.
     private static func pick(_ verb: String, segment: Int, accent: Accent) -> NSAttributedString {
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-            .foregroundColor: accent.nsColor,
+            .font: PlatformFont.systemFont(ofSize: PlatformFont.smallSystemFontSize),
+            .foregroundColor: accent.platformColor,
             .link: URL(string: "\(pickScheme)://segment/\(segment)")!,
             .paragraphStyle: paragraphStyle,
         ]
@@ -58,11 +62,11 @@ enum DiffRenderer {
 
     private static let paragraphStyle: NSParagraphStyle = {
         let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = 1.5
+        style.lineHeightMultiple = ProseStyle.lineHeight
         return style
     }()
 
-    private static func run(_ token: String, color: NSColor, decoration: NSAttributedString.Key? = nil) -> NSAttributedString {
+    private static func run(_ token: String, color: PlatformColor, decoration: NSAttributedString.Key? = nil) -> NSAttributedString {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: ProseStyle.font,
             .foregroundColor: color,

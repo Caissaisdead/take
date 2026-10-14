@@ -2,7 +2,14 @@ import SwiftUI
 
 @main
 struct TakeApp: App {
-    @State private var model = ProjectModel()
+    @State private var model: ProjectModel
+
+    init() {
+        let model = ProjectModel()
+        model.installTerminationSave()
+        model.openAtLaunch()
+        _model = State(initialValue: model)
+    }
 
     var body: some Scene {
         WindowGroup {

@@ -234,7 +234,7 @@ private struct HeaderView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.cardBackground, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(isOpen ? accent : Color.secondary.opacity(0.3), lineWidth: isOpen ? 2 : 1))
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .help("Main. Click to open the scene.")
@@ -252,7 +252,7 @@ private struct BeadView: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(bead.isKeep ? accent : Color(nsColor: .controlBackgroundColor))
+                .fill(bead.isKeep ? accent : Color.cardBackground)
                 .frame(width: isHead ? 14 : 11, height: isHead ? 14 : 11)
             Circle()
                 .strokeBorder(isOpen ? accent : Color.primary.opacity(0.7), lineWidth: isHead ? 2.5 : 2)
@@ -335,7 +335,7 @@ private struct TakeCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(faded ? Color(nsColor: .controlBackgroundColor) : accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .background(faded ? Color.cardBackground : accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(isOpen ? accent : Color.secondary.opacity(0.3), lineWidth: isOpen ? 2 : 1))
         .opacity(faded ? 0.55 : 1)
         .contentShape(RoundedRectangle(cornerRadius: 10))

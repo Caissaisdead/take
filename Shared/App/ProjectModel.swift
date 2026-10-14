@@ -1,13 +1,14 @@
-import AppKit
 import Foundation
 import Observation
 import os
 import ManuscriptKit
 
-/// The one project the spike opens, and everything the window shows of it. Every
+/// The one project the app opens, and everything the window shows of it. Every
 /// store call is wrapped so a thrown error lands in `statusLine`; the store is
 /// synchronous and small, so it runs on the main actor, but never from inside
-/// the text storage delegate.
+/// the text storage delegate. Shared by the Mac and the iPhone: what differs
+/// (how a project is chosen and remembered, where the token lives, the
+/// editor's view, the bench) lives in each app's own extension.
 @MainActor
 @Observable
 final class ProjectModel {
@@ -108,7 +109,6 @@ final class ProjectModel {
     @ObservationIgnored private var store: ProjectStore?
     @ObservationIgnored private var idleSave: Task<Void, Never>?
     @ObservationIgnored private var recount: Task<Void, Never>?
-    @ObservationIgnored private var bench: Task<Void, Never>?
     /// Reads the editor's text on demand, once the editor exists.
     @ObservationIgnored private var readEditor: (() -> String?)?
     /// Selects a range in the editor as it is, without a reload.
@@ -122,23 +122,22 @@ final class ProjectModel {
     /// Held for the life of the project so the sandbox keeps the grant.
     @ObservationIgnored private var scopedURL: URL?
 
-    init() {
-        // Bench runs and poses always use the sample; otherwise the last project, else the sample.
-        if !Self.isBenchRequested, Self.shotPose == nil, let url = Self.lastProjectURL() {
-            open(url)
-        }
-        if store == nil {
-            open(Self.sampleFolder, seedingSample: true)
-        }
-        // The idle save waits ten seconds; a quit inside them must not lose
-        // the text. The notice is posted on the main thread, before any
-        // window goes, so the save runs whole.
-        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.isDirty else { return }
-                self.save()
-            }
-        }
+    init() {}
+
+    /// Saves what is unsaved before the app goes: the idle save waits ten
+    /// seconds, and a quit or a trip to the background inside them must not
+    /// lose the text. Called on the main thread, before any window goes, so
+    /// the save runs whole.
+    func saveBeforeLeaving() {
+        if isDirty { save() }
+    }
+
+    /// Drops what was typed without saving it; the bench's text has no place
+    /// in the project's history.
+    func abandonEdits() {
+        idleSave?.cancel()
+        recount?.cancel()
+        isDirty = false
     }
 
     /// The window's name: the manuscript's title, or the folder's.
@@ -148,12 +147,18 @@ final class ProjectModel {
 
     // MARK: - Projects
 
+    /// Who the commits are by: the device's idea of the writer's name.
+    static var author: Signature {
+        Signature(name: Platform.authorName, email: "writer@localhost")
+    }
+
     /// Opens the project at `url`, or makes one there when the folder is empty
-    /// or missing (the sample is seeded when asked). A folder with files in it
+    /// or missing (the sample is seeded when asked, titled `title` or after
+    /// the folder). A folder with files in it
     /// and no repository is left alone: a project without its `.git`, or any
     /// other folder, must not be written over. A failure leaves whatever was
     /// open as it was.
-    func open(_ url: URL, seedingSample: Bool = false) {
+    func open(_ url: URL, seedingSample: Bool = false, title: String? = nil) {
         settle()
         guard !isDirty else { return }
         // Three Takes holds the store it started on; let it finish or be
@@ -167,7 +172,7 @@ final class ProjectModel {
         untangling = nil
         untangleError = nil
         isUntangling = false
-        let author = Signature(name: NSFullUserName(), email: "writer@localhost")
+        let author = Self.author
         let scoped = url.startAccessingSecurityScopedResource() ? url : nil
         do {
             let opened: ProjectStore
@@ -180,7 +185,7 @@ final class ProjectModel {
                     return
                 }
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-                opened = try ProjectStore.create(at: url, title: url.lastPathComponent, author: author)
+                opened = try ProjectStore.create(at: url, title: title ?? url.lastPathComponent, author: author)
                 if seedingSample {
                     let first = try opened.addScene(title: "A truth universally acknowledged", toChapter: nil, text: Self.sampleText())
                     let chapter = try opened.manifest().chapters.first { $0.scenes.contains { $0.id == first.id } }?.id
@@ -208,77 +213,15 @@ final class ProjectModel {
         }
     }
 
-    /// Asks for a folder to open. An empty folder becomes a new project.
-    func openProject() {
-        Task {
-            if let url = await ProjectPanels.chooseProjectFolder() { open(url) }
-        }
-    }
-
-    /// Asks where to make a project, named after the folder chosen.
-    func newProject() {
-        Task {
-            if let url = await ProjectPanels.chooseNewProjectFolder() { open(url) }
-        }
-    }
-
-    /// Reads a manuscript from a file or a folder into a new project, or takes
-    /// in a project folder that has its manifest but no repository.
-    func importProject() {
-        guard !isWritingTakes else {
-            statusLine = "Three Takes is still writing; stop it before importing"
-            return
-        }
-        Task {
-            guard let source = await ProjectPanels.chooseImport() else { return }
-            let granted = source.startAccessingSecurityScopedResource()
-            defer { if granted { source.stopAccessingSecurityScopedResource() } }
-            if FileManager.default.fileExists(atPath: source.appendingPathComponent(Manuscript.manifestPath).path),
-               !FileManager.default.fileExists(atPath: source.appendingPathComponent(".git").path) {
-                adopt(source)
-                return
-            }
-            let draft: Draft
-            do {
-                draft = try ManuscriptReader.draft(from: source)
-            } catch {
-                statusLine = "Import failed: \(error.localizedDescription)"
-                return
-            }
-            let counts = "\(draft.chapters.count) \(draft.chapters.count == 1 ? "chapter" : "chapters"), \(draft.scenes.count) \(draft.scenes.count == 1 ? "scene" : "scenes")"
-            guard let url = await ProjectPanels.chooseNewProjectFolder(named: draft.title, message: "\(counts) read from \(source.lastPathComponent). The folder becomes the project.") else { return }
-            settle()
-            guard !isDirty else { return }
-            guard Self.isEmptyFolder(url) else {
-                statusLine = "\(url.lastPathComponent) has files in it; choose an empty folder"
-                return
-            }
-            let author = Signature(name: NSFullUserName(), email: "writer@localhost")
-            do {
-                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-                _ = try ProjectStore.create(at: url, draft: draft, author: author)
-            } catch {
-                statusLine = "Import failed: \(error.localizedDescription)"
-                return
-            }
-            open(url)
-            statusLine = "Imported \(counts) into \(url.lastPathComponent)"
-        }
-    }
-
     // MARK: - Backup
 
-    /// The remote the open project backs up to, kept per project folder.
+    /// The remote the open project backs up to, kept per project where the
+    /// platform keeps such things (`readRemote`, `writeRemote`).
     var backupRemote: String {
-        get { projectURL.flatMap { UserDefaults.standard.string(forKey: Self.backupKey($0)) } ?? "" }
+        get { projectURL.map { Self.readRemote(for: $0) } ?? "" }
         set {
             guard let projectURL else { return }
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                UserDefaults.standard.removeObject(forKey: Self.backupKey(projectURL))
-            } else {
-                UserDefaults.standard.set(trimmed, forKey: Self.backupKey(projectURL))
-            }
+            Self.writeRemote(newValue.trimmingCharacters(in: .whitespacesAndNewlines), for: projectURL)
             backupVersion += 1
         }
     }
@@ -287,10 +230,6 @@ final class ProjectModel {
     private(set) var backupVersion = 0
     private(set) var isBackingUp = false
     private(set) var lastBackup: Date?
-
-    private static func backupKey(_ url: URL) -> String {
-        "BackupRemote:" + url.standardizedFileURL.path
-    }
 
     /// Pushes main, the milestones and every take to the remote, after
     /// saving what is unsaved. The push runs off the main thread on a
@@ -304,7 +243,7 @@ final class ProjectModel {
         }
         settle()
         guard !isDirty else { return }
-        let token = KeychainItem.backupToken.read()
+        let token = backupToken()
         isBackingUp = true
         statusLine = "Backing up to \(remote)…"
         Task {
@@ -323,77 +262,19 @@ final class ProjectModel {
     }
 
     /// libgit2's words for the usual failures, in the writer's.
-    private static func plain(_ error: Error) -> String {
+    static func plain(_ error: Error) -> String {
         let text = error.localizedDescription
-        if text.localizedCaseInsensitiveContains("turned away") { return "the remote has changes this Mac does not; pull them with git before backing up again" }
+        if text.localizedCaseInsensitiveContains("turned away") { return "the remote has changes this \(Platform.deviceName) does not; pull them before backing up again" }
         if text.localizedCaseInsensitiveContains("auth") || text.contains("401") || text.contains("403") { return "the remote refused the token; check it in Settings" }
         if text.localizedCaseInsensitiveContains("resolve") || text.localizedCaseInsensitiveContains("connect") { return "the remote could not be reached" }
         return text
     }
 
-    /// A project folder without its repository becomes one again, in place.
-    private func adopt(_ url: URL) {
-        settle()
-        guard !isDirty else { return }
-        let author = Signature(name: NSFullUserName(), email: "writer@localhost")
-        do {
-            _ = try ProjectStore.adopt(at: url, author: author)
-        } catch {
-            statusLine = "Could not take in \(url.lastPathComponent): \(error.localizedDescription)"
-            return
-        }
-        open(url)
-        statusLine = "Took in \(url.lastPathComponent) as a project"
-    }
-
-    func openSample() {
-        open(Self.sampleFolder, seedingSample: true)
-    }
-
-    func revealInFinder() {
-        guard let projectURL else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([projectURL])
-    }
-
-    /// Terminal, opened on the project folder, for a writer who works with
-    /// git or an agent on the real repository.
-    func openInTerminal() {
-        guard let projectURL else { return }
-        let terminal = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
-        NSWorkspace.shared.open([projectURL], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration()) { _, error in
-            if let error {
-                Task { @MainActor in self.statusLine = "Terminal did not open: \(error.localizedDescription)" }
-            }
-        }
-    }
-
     /// A folder that is not there yet counts as empty; the Finder's own
     /// `.DS_Store` does not count as a file.
-    private static func isEmptyFolder(_ url: URL) -> Bool {
+    static func isEmptyFolder(_ url: URL) -> Bool {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: url.path) else { return true }
         return names.allSatisfy { $0 == ".DS_Store" }
-    }
-
-    private static let bookmarkKey = "LastProjectBookmark"
-
-    private static func remember(_ url: URL) {
-        if let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
-            UserDefaults.standard.set(data, forKey: bookmarkKey)
-        }
-    }
-
-    /// The last project's folder, when it still holds a repository. The sandbox
-    /// answers nothing about a folder outside the container until its grant is
-    /// taken up, so the check runs inside one; `open` takes its own, and
-    /// `remember` renews a bookmark that has gone stale.
-    private static func lastProjectURL() -> URL? {
-        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
-        var stale = false
-        guard let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }
-        let granted = url.startAccessingSecurityScopedResource()
-        defer { if granted { url.stopAccessingSecurityScopedResource() } }
-        guard FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) else { return nil }
-        return url
     }
 
     /// The loaded text plus whatever has been typed since, as the editor holds
@@ -595,14 +476,6 @@ final class ProjectModel {
         }
     }
 
-    /// The stress text in the editor, for the bench alone. Not marked dirty,
-    /// so the idle save never commits it over the scene; only a save the
-    /// writer asks for does.
-    func loadStress() {
-        setEditorText(Prose.editorForm(Self.stressText), dirty: false)
-        statusLine = "Stress text loaded, \(wordCount) words; Save would commit it"
-    }
-
     func recordLoad(millis: Double) {
         lastLoadMillis = millis
         log.info("editor load \(millis, format: .fixed(precision: 1)) ms for \(self.wordCount) words")
@@ -747,7 +620,7 @@ final class ProjectModel {
     }
 
     /// Saves whatever is dirty so a shape change never sits on unsaved text.
-    private func settle() {
+    func settle() {
         if isDirty { save() }
     }
 
@@ -1032,90 +905,45 @@ final class ProjectModel {
 
     // MARK: - Export
 
-    enum ExportKind { case markdown, docx, pdf }
+    /// What an export is made from: the draft on main, or one chapter of it,
+    /// as it stands after saving whatever was unsaved, so the export matches
+    /// the screen. Nil when nothing is open or the save failed.
+    struct ExportCut {
+        /// A file name for the whole or the chapter, without an extension.
+        let name: String
+        let manuscript: Manuscript
+        let text: (SceneID) throws -> String
+        let markdown: () throws -> [ExportFile]
+    }
 
-    /// The draft on main, or one chapter of it, as a folder of Markdown, a
-    /// Word document or a PDF, after saving whatever is unsaved so the export
-    /// matches the screen.
-    func export(_ kind: ExportKind, chapter: UUID? = nil) {
-        guard let store else { return }
+    func exportCut(chapter: UUID? = nil) -> ExportCut? {
+        guard let store else { return nil }
         settle()
-        guard !isDirty else { return }
+        guard !isDirty else { return nil }
         let name = MarkdownExport.fileName(
             chapter.flatMap { manuscript.chapter($0)?.title } ?? manuscript.title,
             fallback: chapter == nil ? "Manuscript" : "Chapter")
         do {
             let head = try store.mainHead()
             let cut = try store.manifest(chapter: chapter)
-            let text: (SceneID) throws -> String = { try store.sceneText($0, at: head) }
-            switch kind {
-            case .markdown:
-                let files = try store.exportMarkdown(chapter: chapter)
-                Task { await finish("Exported \(files.count) files") { try await ExportCoordinator.exportMarkdown(files, suggestedName: name) } }
-            case .docx:
-                let data = try DocxWriter.data(for: cut, text: text)
-                Task { await finish("Exported") { try await ExportCoordinator.exportDocx(data, suggestedName: name) } }
-            case .pdf:
-                let data = try PDFWriter.data(for: cut, text: text)
-                Task { await finish("Exported") { try await ExportCoordinator.exportPDF(data, suggestedName: name) } }
-            }
+            return ExportCut(
+                name: name,
+                manuscript: cut,
+                text: { try store.sceneText($0, at: head) },
+                markdown: { try store.exportMarkdown(chapter: chapter) })
         } catch {
             statusLine = "Export failed: \(error.localizedDescription)"
+            return nil
         }
     }
 
-    /// Runs the save panel and reports where the export went, or why not.
-    private func finish(_ verb: String, _ save: () async throws -> URL?) async {
-        do {
-            if let url = try await save() {
-                statusLine = "\(verb) to \(url.lastPathComponent)"
-            }
-        } catch {
-            statusLine = "Export failed: \(error.localizedDescription)"
-        }
-    }
+    // MARK: - Editor
 
-    // MARK: - Bench
-
-    /// With `-TakeBench` on the command line (or the `TakeBench` default set),
-    /// runs the benchmark once the editor exists, writes `bench.json` beside the
-    /// project and quits, so a harness needs nothing from the UI.
-    func editorReady(_ textView: ProseTextView) {
-        readEditor = { [weak textView] in textView?.string }
-        showInEditor = { [weak textView] range in
-            textView?.show(range)
-            textView?.window?.makeFirstResponder(textView)
-        }
-        guard Self.isBenchRequested, bench == nil else { return }
-        bench = Task { await runBench(on: textView) }
-    }
-
-    private func runBench(on textView: ProseTextView) async {
-        // Measured in the real window: wait for it to be up and to have laid out a
-        // first viewport, with a cap so a stuck launch still ends in a quit.
-        let deadline = ContinuousClock.now + .seconds(10)
-        while ContinuousClock.now < deadline {
-            if let window = textView.window, window.isVisible, !textView.visibleRect.isEmpty,
-               let viewport = textView.textLayoutManager?.textViewportLayoutController.viewportBounds, viewport.height > 0 {
-                break
-            }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-        let result = Bench(textView: textView).run([("scene", Self.sampleText()), ("stress", Self.stressText)])
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            encoder.dateEncodingStrategy = .iso8601
-            try encoder.encode(result).write(to: Self.benchFile)
-            log.info("bench written to \(Self.benchFile.path)")
-        } catch {
-            log.error("bench not written: \(error.localizedDescription)")
-        }
-        // Nothing typed here belongs in the project's history.
-        idleSave?.cancel()
-        recount?.cancel()
-        isDirty = false
-        NSApp.terminate(nil)
+    /// The view editing the scene, once it exists: the model reads the text
+    /// back through it and selects ranges in it without a reload.
+    func editorReady(_ host: any EditorHost) {
+        readEditor = { [weak host] in host?.currentText }
+        showInEditor = { [weak host] range in host?.reveal(range) }
     }
 
     // MARK: - Takes
@@ -1294,7 +1122,7 @@ final class ProjectModel {
 
     // MARK: - Plumbing
 
-    private func refresh() {
+    func refresh() {
         guard let store else { return }
         mapVersion += 1
         attempt("Refresh") {
@@ -1320,7 +1148,7 @@ final class ProjectModel {
         }
     }
 
-    private func setEditorText(_ text: String, dirty: Bool, selecting: NSRange? = nil) {
+    func setEditorText(_ text: String, dirty: Bool, selecting: NSRange? = nil) {
         idleSave?.cancel()
         recount?.cancel()
         editorText = text
@@ -1352,7 +1180,7 @@ final class ProjectModel {
         }
     }
 
-    private func attempt(_ what: String, _ body: () throws -> Void) {
+    func attempt(_ what: String, _ body: () throws -> Void) {
         do {
             try body()
         } catch {
@@ -1362,33 +1190,13 @@ final class ProjectModel {
 
     // MARK: - Fixtures
 
-    /// The seeded sample, in the app's own container.
-    static var sampleFolder: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        return support.appendingPathComponent("Take", isDirectory: true)
-            .appendingPathComponent("Sample Project", isDirectory: true)
-    }
-
-    static let isBenchRequested = CommandLine.arguments.contains("-TakeBench") || UserDefaults.standard.bool(forKey: "TakeBench")
-
     /// With `-TakeShot <pose>` on the command line the app opens the sample
     /// and poses for a store screenshot: `take`, `compare`, `map`, `since` or
     /// `settings`. Nothing is saved.
     static let shotPose: String? = UserDefaults.standard.string(forKey: "TakeShot")
 
-    static var benchFile: URL {
-        sampleFolder.deletingLastPathComponent().appendingPathComponent("bench.json")
-    }
-
-    /// The sample scene four times over: about 20k words.
-    static var stressText: String {
-        let block = sampleText().trimmingCharacters(in: .whitespacesAndNewlines)
-        return Array(repeating: block, count: 4).joined(separator: "\n\n") + "\n"
-    }
-
     static func sampleText() -> String {
-        let url = Bundle.main.url(forResource: "sample-scene", withExtension: "md", subdirectory: "Resources")
+        let url = Bundle.main.url(forResource: "sample-scene", withExtension: "md", subdirectory: "Sample")
             ?? Bundle.main.url(forResource: "sample-scene", withExtension: "md")
         guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else {
             return "The sample scene is missing from the app bundle.\n"

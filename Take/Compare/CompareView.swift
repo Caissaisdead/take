@@ -94,8 +94,8 @@ private struct DiffTextView: NSViewRepresentable {
         textView.frame = NSRect(origin: .zero, size: scrollView.contentSize)
         textView.delegate = context.coordinator
         textView.isAutomaticLinkDetectionEnabled = false
-        textView.linkTextAttributes = [.foregroundColor: accent.nsColor, .cursor: NSCursor.pointingHand]
-        textView.selectedTextAttributes = [.backgroundColor: accent.nsColor.withAlphaComponent(0.22)]
+        textView.linkTextAttributes = [.foregroundColor: accent.platformColor, .cursor: NSCursor.pointingHand]
+        textView.selectedTextAttributes = [.backgroundColor: accent.platformColor.withAlphaComponent(0.22)]
         textView.textStorage?.setAttributedString(content)
 
         scrollView.documentView = textView
@@ -105,8 +105,8 @@ private struct DiffTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.onPick = onPick
         if let textView = scrollView.documentView as? NSTextView {
-            textView.linkTextAttributes = [.foregroundColor: accent.nsColor, .cursor: NSCursor.pointingHand]
-            textView.selectedTextAttributes = [.backgroundColor: accent.nsColor.withAlphaComponent(0.22)]
+            textView.linkTextAttributes = [.foregroundColor: accent.platformColor, .cursor: NSCursor.pointingHand]
+            textView.selectedTextAttributes = [.backgroundColor: accent.platformColor.withAlphaComponent(0.22)]
         }
         guard let textView = scrollView.documentView as? NSTextView,
               let storage = textView.textStorage,
