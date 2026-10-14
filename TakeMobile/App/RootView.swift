@@ -1,8 +1,10 @@
 import SwiftUI
+import ManuscriptKit
 
 /// Where the stack can go from Projects.
 enum Route: Hashable {
     case project(UUID)
+    case scene(SceneID)
 }
 
 /// One stack: Projects, then a project's binder, then a scene. Opens on the
@@ -18,8 +20,10 @@ struct RootView: View {
             ProjectsView(path: $path)
                 .navigationDestination(for: Route.self) { route in
                     switch route {
-                    case .project(let id):
-                        ProjectScreen(id: id, path: $path)
+                    case .project:
+                        MobileBinderView(path: $path)
+                    case .scene:
+                        SceneScreen()
                     }
                 }
         }
@@ -42,24 +46,19 @@ struct RootView: View {
     }
 }
 
-/// Stands in for the binder until it is built: the project's name, its
-/// counts and the status line.
-struct ProjectScreen: View {
+/// Stands in for the editor until it is built: the scene's text, read only.
+struct SceneScreen: View {
     @Environment(ProjectModel.self) private var model
-    let id: UUID
-    @Binding var path: [Route]
 
     var body: some View {
-        List {
-            Section {
-                LabeledContent("Words", value: model.totalWords.formatted())
-                LabeledContent("Chapters", value: "\(model.manuscript.chapters.count)")
-                LabeledContent("Scenes", value: "\(model.manuscript.scenes.count)")
-            }
-            if !model.statusLine.isEmpty {
-                Section { Text(model.statusLine).font(.caption).foregroundStyle(.secondary) }
-            }
+        ScrollView {
+            Text(model.editorText)
+                .font(.system(size: 18, design: .serif))
+                .lineSpacing(6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
         }
-        .navigationTitle(model.projectName)
+        .navigationTitle(model.sceneTitle)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
