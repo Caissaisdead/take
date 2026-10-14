@@ -261,6 +261,142 @@ final class ProjectModel {
         }
     }
 
+    // MARK: - Pull
+
+    private(set) var isPulling = false
+    private(set) var lastPull: Date?
+    /// Both sides moved since they last agreed: the sheet asks what to do
+    /// with this side's text. Nil once settled or put off.
+    var pullDivergence: PullDivergence?
+
+    /// Fetches the remote, brings its takes and milestones across and moves
+    /// main forward when only the remote moved, after saving what is
+    /// unsaved. The transfer runs off the main thread on a repository of its
+    /// own. When both sides moved, nothing changes until the writer answers
+    /// the sheet.
+    func pull() {
+        guard let projectURL, !isPulling, !isBackingUp else { return }
+        let remote = backupRemote
+        guard !remote.isEmpty else {
+            statusLine = "Set a remote in Settings first"
+            return
+        }
+        settle()
+        guard !isDirty else { return }
+        let token = backupToken()
+        isPulling = true
+        statusLine = "Pulling from \(remote)…"
+        Task {
+            let result: Result<PullResult, Error> = await Task.detached {
+                Result { try ProjectStore.pull(projectAt: projectURL, from: remote, token: token) }
+            }.value
+            isPulling = false
+            switch result {
+            case .success(let pulled):
+                finishPull(pulled, from: remote)
+            case .failure(let error):
+                statusLine = "Pull failed: \(Self.plain(error))"
+            }
+        }
+    }
+
+    /// Settles the divergence the sheet showed: main becomes the remote's
+    /// and this side's text lives on as takes.
+    func keepMineAsTakes() {
+        guard let store, let divergence = pullDivergence else { return }
+        pullDivergence = nil
+        var kept: [Take] = []
+        attempt("Pull") {
+            kept = try store.keepMineAsTakes(divergence, device: Platform.deviceName)
+            let count = divergence.changed.count
+            let name = kept.first?.name ?? "\(Platform.deviceName) today"
+            statusLine = count == 0
+                ? "Set main to the remote's" + (divergence.added.isEmpty ? "" : " and put \(Self.count(divergence.added.count, "scene")) back")
+                : "Kept \(Self.count(count, "scene")) as takes named \(name) and set main to the remote's"
+        }
+        reloadAfterMainMoved()
+    }
+
+    /// Puts the sheet away without settling: main stays this side's, and a
+    /// backup is turned away until the writer comes back to it.
+    func decidePullLater() {
+        pullDivergence = nil
+        statusLine = "Main is still this \(Platform.deviceName)'s; Pull again when you are ready to choose"
+    }
+
+    private func finishPull(_ result: PullResult, from remote: String) {
+        guard let store else { return }
+        attempt("Pull") { try store.reload() }
+        lastPull = Date()
+        let brought = Self.describe(brought: result.brought)
+        switch result.main {
+        case .alreadyUpToDate:
+            statusLine = brought.map { "Brought \($0) from \(remote)" } ?? "Up to date with \(remote)"
+            refresh()
+        case .remoteEmpty:
+            statusLine = "The remote has no draft yet; Back Up puts this one there"
+            refresh()
+        case .ahead(let commits):
+            statusLine = "Nothing to pull; this \(Platform.deviceName) has \(Self.count(commits, "save")) the remote lacks, and Back Up sends them"
+            refresh()
+        case .fastForwarded(let commits):
+            statusLine = "Pulled \(Self.count(commits, "commit")) from \(remote)" + (brought.map { " and \($0)" } ?? "")
+            reloadAfterMainMoved()
+        case .diverged(let divergence):
+            refresh()
+            pullDivergence = divergence
+            statusLine = "The remote and this \(Platform.deviceName) both changed since they last agreed"
+        }
+        if !result.renamed.isEmpty {
+            let clashes = result.renamed.map { "\(Self.refName($0.remote)) came in as \(Self.refName($0.local))" }
+            statusLine += "; " + clashes.joined(separator: ", ")
+        }
+    }
+
+    /// Main moved under the editor: reread everything and show the open
+    /// scene as it now stands, or main's first scene when the open one went.
+    private func reloadAfterMainMoved() {
+        refresh()
+        guard let selection else { return }
+        let scene = selection.sceneID
+        if case .take(let take) = selection, let fresh = takes.first(where: { $0.id == take.id }) {
+            select(.take(fresh))
+        } else if manuscript.scene(scene) != nil {
+            select(.main(scene))
+        } else if let first = manuscript.scenes.first {
+            select(.main(first.id))
+        } else {
+            self.selection = nil
+            setEditorText("", dirty: false)
+        }
+    }
+
+    /// "2 takes and 1 milestone", or nil for nothing.
+    private static func describe(brought refs: [String]) -> String? {
+        let takes = refs.filter { $0.hasPrefix(ProjectStore.takesPrefix) }.count
+        let discarded = refs.filter { $0.hasPrefix(ProjectStore.discardedPrefix) }.count
+        let milestones = refs.filter { $0.hasPrefix(ProjectStore.milestonesPrefix) }.count
+        var parts: [String] = []
+        if takes > 0 { parts.append(count(takes, "take")) }
+        if discarded > 0 { parts.append(count(discarded, "discarded take")) }
+        if milestones > 0 { parts.append(count(milestones, "milestone")) }
+        switch parts.count {
+        case 0: return nil
+        case 1: return parts[0]
+        default: return parts.dropLast().joined(separator: ", ") + " and " + parts.last!
+        }
+    }
+
+    static func count(_ n: Int, _ noun: String) -> String {
+        "\(n) \(n == 1 ? noun : noun + "s")"
+    }
+
+    /// A take or milestone's name from the end of its ref.
+    private static func refName(_ ref: String) -> String {
+        let last = String(ref.split(separator: "/").last ?? "")
+        return last.removingPercentEncoding ?? last
+    }
+
     /// libgit2's words for the usual failures, in the writer's.
     static func plain(_ error: Error) -> String {
         let text = error.localizedDescription

@@ -149,6 +149,9 @@ struct ContentView: View {
         .sheet(isPresented: $model.consent) {
             ConsentSheet()
         }
+        .sheet(isPresented: Binding(get: { model.pullDivergence != nil }, set: { if !$0 { model.decidePullLater() } })) {
+            PullConflictSheet()
+        }
         .sheet(isPresented: Binding(get: { model.takeRuns != nil }, set: { if !$0 { model.cancelThreeTakes() } })) {
             ThreeTakesSheet()
         }

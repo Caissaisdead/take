@@ -104,8 +104,13 @@ struct SettingsView: View {
                         model.backupRemote = remote
                         model.backUp()
                     }
-                    .disabled(remote.trimmingCharacters(in: .whitespaces).isEmpty || model.isBackingUp)
-                    if model.isBackingUp { ProgressView().controlSize(.small) }
+                    .disabled(remote.trimmingCharacters(in: .whitespaces).isEmpty || model.isBackingUp || model.isPulling)
+                    Button("Pull Now") {
+                        model.backupRemote = remote
+                        model.pull()
+                    }
+                    .disabled(remote.trimmingCharacters(in: .whitespaces).isEmpty || model.isBackingUp || model.isPulling)
+                    if model.isBackingUp || model.isPulling { ProgressView().controlSize(.small) }
                     Spacer()
                     if hasToken {
                         Button("Remove Token") {
@@ -118,7 +123,7 @@ struct SettingsView: View {
             } header: {
                 Text("Backup of \(model.projectName)")
             } footer: {
-                Text("Draft > Back Up pushes main, the milestones and every take to this remote over HTTPS with the token, which lives in the keychain. The remote is kept per project. A remote that has changes this Mac lacks is left as it is.")
+                Text(backupFooter)
             }
 
             Section {
@@ -135,6 +140,14 @@ struct SettingsView: View {
         .onAppear { remote = model.backupRemote }
         .onChange(of: model.backupVersion) { remote = model.backupRemote }
         .onDisappear { model.backupRemote = remote }
+    }
+
+    private var backupFooter: String {
+        var lines = ["Draft > Back Up pushes main, the milestones and every take to this remote over HTTPS with the token, which lives in the keychain. Draft > Pull brings the remote's down: main moves forward when only the remote changed, and when both sides changed, this Mac's text is kept as takes. The remote is kept per project."]
+        let when: (Date) -> String = { $0.formatted(.relative(presentation: .named)) }
+        if let last = model.lastBackup { lines.append("Backed up \(when(last)).") }
+        if let last = model.lastPull { lines.append("Pulled \(when(last)).") }
+        return lines.joined(separator: " ")
     }
 
     private func saveToken() {

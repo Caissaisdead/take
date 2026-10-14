@@ -116,7 +116,7 @@ extension ProjectStore {
         for scene in divergence.added {
             let chapter = before.chapter(containing: scene.id)?.id
             let destination = chapter.flatMap { now.chapter($0) == nil ? nil : $0 }
-            try addScene(title: scene.title, toChapter: destination, text: texts[scene.id] ?? "", id: scene.id,
+            _ = try addScene(title: scene.title, toChapter: destination, text: texts[scene.id] ?? "", id: scene.id,
                          synopsis: scene.synopsis, notes: scene.notes, message: "Bring \(Self.label(scene.title)) from \(device)")
         }
         let name = "\(device) \(Self.pullName.string(from: clock()))"

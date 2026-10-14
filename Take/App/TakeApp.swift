@@ -68,7 +68,10 @@ struct TakeApp: App {
                 Divider()
                 Button("Back Up") { model.backUp() }
                     .keyboardShortcut("b", modifiers: [.command, .shift])
-                    .disabled(model.backupRemote.isEmpty || model.isBackingUp)
+                    .disabled(model.backupRemote.isEmpty || model.isBackingUp || model.isPulling)
+                Button("Pull") { model.pull() }
+                    .keyboardShortcut("b", modifiers: [.command, .option])
+                    .disabled(model.backupRemote.isEmpty || model.isBackingUp || model.isPulling)
                 Button("Reveal in Finder") { model.revealInFinder() }
                 Button("Open in Terminal") { model.openInTerminal() }
                     .keyboardShortcut("t", modifiers: [.command, .option])
