@@ -267,4 +267,87 @@ private func data(_ text: String) -> Data { Data(text.utf8) }
             #expect(added.content == data("New.\n"))
         }
     }
+
+    @Test func cloneAndFetchRoundTrip() throws {
+        try withTemporaryDirectory { url in
+            let bare = try Repository.create(at: url.appendingPathComponent("remote.git"), bare: true)
+            let remote = "file://" + bare.workingDirectory.path
+            let a = try Repository.create(at: url.appendingPathComponent("a"))
+            try a.writeWorkingFile(atPath: "a.md", data: data("one\n"))
+            let first = try a.createCommit(tree: try a.writeIndexTree(), parents: [], author: jane, message: "1", updatingRef: "refs/heads/main")
+            try a.writeWorkingFile(atPath: "a.md", data: data("two\n"))
+            let second = try a.createCommit(tree: try a.writeIndexTree(), parents: [first], author: jane, message: "2", updatingRef: "refs/heads/main")
+            try a.updateRef("refs/takes/s1/alt", to: first, message: "take")
+            let tag = try a.createTag("milestones/first", target: first, tagger: jane, message: "First")
+            try a.push(to: remote, refspecs: ["refs/heads/main:refs/heads/main", "refs/takes/s1/alt:refs/takes/s1/alt", "refs/tags/milestones/first:refs/tags/milestones/first"], token: nil)
+
+            // A clone has main checked out, the tags, and no takes.
+            let b = try Repository.clone(from: remote, to: url.appendingPathComponent("b"), token: nil)
+            #expect(try b.resolve("refs/heads/main") == second)
+            #expect(try b.resolve("HEAD") == second)
+            #expect(try Data(contentsOf: b.workingDirectory.appendingPathComponent("a.md")) == data("two\n"))
+            #expect(try b.refs(withPrefix: "refs/takes/") == [])
+            #expect(try b.refs(withPrefix: "refs/tags/") == ["refs/tags/milestones/first"])
+
+            // The listing shows every ref the remote has.
+            let listed = try b.remoteRefs(at: remote, token: nil)
+            #expect(Set(listed.map(\.name)) == ["refs/heads/main", "refs/takes/s1/alt", "refs/tags/milestones/first"])
+            #expect(listed.first { $0.name == "refs/heads/main" }?.id == second)
+            #expect(listed.first { $0.name == "refs/takes/s1/alt" }?.id == first)
+            #expect(listed.first { $0.name == "refs/tags/milestones/first" }?.id == tag)
+
+            // An explicit refspec lands exactly where it says.
+            try b.fetch(from: remote, refspecs: ["+refs/takes/s1/alt:refs/remotes/origin/pull/takes/s1/alt", "+refs/tags/milestones/first:refs/remotes/origin/pull/milestones/first"], token: nil)
+            #expect(try b.resolve("refs/remotes/origin/pull/takes/s1/alt") == first)
+            #expect(try b.refs(withPrefix: "refs/remotes/origin/pull/milestones/") == ["refs/remotes/origin/pull/milestones/first"])
+            #expect(try b.tag(tag).message == "First")
+            #expect(try b.refs(withPrefix: "refs/takes/") == [])
+
+            // Ancestry and counting.
+            #expect(try b.isAncestor(first, of: second))
+            #expect(try !b.isAncestor(second, of: first))
+            #expect(try b.isAncestor(second, of: second))
+            #expect(try b.countCommits(from: second, excluding: first) == 1)
+            #expect(try b.countCommits(from: second, excluding: nil) == 2)
+            #expect(try b.countCommits(from: first, excluding: second) == 0)
+        }
+    }
+
+    @Test func cloneWithoutAccessThrowsGitError() throws {
+        try withTemporaryDirectory { url in
+            #expect(throws: GitError.self) {
+                try Repository.clone(from: "file://" + url.appendingPathComponent("nowhere.git").path, to: url.appendingPathComponent("b"), token: nil)
+            }
+        }
+    }
+
+    @Test func checkoutTreeFollowsTheCommitAndLeavesUntrackedFilesAlone() throws {
+        try withTemporaryDirectory { url in
+            let repo = try Repository.create(at: url)
+            try repo.writeWorkingFile(atPath: "a.md", data: data("a1\n"))
+            try repo.writeWorkingFile(atPath: "ch/b.md", data: data("b1\n"))
+            let first = try repo.createCommit(tree: try repo.writeIndexTree(), parents: [], author: jane, message: "1", updatingRef: "refs/heads/main")
+            var tree = try repo.tree(replacing: "a.md", with: try repo.writeBlob(data("a2\n")), in: try repo.commit(first).tree)
+            tree = try repo.tree(replacing: "ch/b.md", with: nil, in: tree)
+            tree = try repo.tree(replacing: "ch/c.md", with: try repo.writeBlob(data("c2\n")), in: tree)
+            let second = try repo.createCommit(tree: tree, parents: [first], author: jane, message: "2", updatingRef: nil)
+            try data("mine\n").write(to: url.appendingPathComponent("notes.txt"))
+
+            try repo.checkoutTree(of: second)
+            #expect(try Data(contentsOf: url.appendingPathComponent("a.md")) == data("a2\n"))
+            #expect(!FileManager.default.fileExists(atPath: url.appendingPathComponent("ch/b.md").path))
+            #expect(try Data(contentsOf: url.appendingPathComponent("ch/c.md")) == data("c2\n"))
+            #expect(try Data(contentsOf: url.appendingPathComponent("notes.txt")) == data("mine\n"))
+            #expect(try repo.writeIndexTree() == tree)
+            // The ref did not move; that is the caller's step.
+            #expect(try repo.resolve("refs/heads/main") == first)
+
+            // Back again after the ref moves first: the files still follow.
+            try repo.updateRef("refs/heads/main", to: first, message: "back")
+            try repo.checkoutTree(of: first)
+            #expect(try Data(contentsOf: url.appendingPathComponent("a.md")) == data("a1\n"))
+            #expect(try Data(contentsOf: url.appendingPathComponent("ch/b.md")) == data("b1\n"))
+            #expect(!FileManager.default.fileExists(atPath: url.appendingPathComponent("ch/c.md").path))
+        }
+    }
 }

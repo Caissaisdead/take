@@ -372,7 +372,17 @@ public final class Repository {
     // MARK: - Remote
 
     /// What a push learnt from the other end: refs it turned away.
-    private final class PushState {
+    // MARK: - Remotes
+
+    /// One ref as the other end lists it.
+    public struct RemoteRef: Equatable, Sendable {
+        public let name: String
+        public let id: ObjectID
+    }
+
+    /// What a transfer carries between its callbacks: the token to offer
+    /// once, and what the remote turned away.
+    private final class RemoteState {
         let token: String?
         var asked = false
         var rejected: [String] = []
@@ -380,12 +390,96 @@ public final class Repository {
         init(token: String?) { self.token = token }
     }
 
-    /// Pushes `refspecs` to `url`, answering a request for credentials with
-    /// `token` as the password under a nominal user name, which is how the
-    /// hosting services take a personal access token. A second request means
-    /// the first was refused. A ref the remote turns away (main having moved
-    /// there, say) fails the push with the remote's reason. Blocks for the
-    /// length of the transfer; call it off the main thread on its own
+    /// Callbacks that answer a request for credentials with `token` as the
+    /// password under a nominal user name, which is how the hosting services
+    /// take a personal access token. A second request means the first was
+    /// refused.
+    private static func callbacks(for state: RemoteState) throws -> git_remote_callbacks {
+        var callbacks = git_remote_callbacks()
+        try check(git_remote_init_callbacks(&callbacks, UInt32(GIT_REMOTE_CALLBACKS_VERSION)), "git_remote_init_callbacks")
+        callbacks.payload = Unmanaged.passUnretained(state).toOpaque()
+        callbacks.credentials = { out, _, _, _, payload in
+            guard let payload else { return GIT_EAUTH.rawValue }
+            let state = Unmanaged<RemoteState>.fromOpaque(payload).takeUnretainedValue()
+            guard let token = state.token, !state.asked else { return GIT_EAUTH.rawValue }
+            state.asked = true
+            return git_credential_userpass_plaintext_new(out, "token", token)
+        }
+        return callbacks
+    }
+
+    /// Clones `url` into `folder` with main checked out. The branches and
+    /// tags come across (libgit2 brings tags on a clone whatever it is
+    /// asked); `fetch` brings the takes. Blocks for the length of the
+    /// transfer; call it off the main thread.
+    public static func clone(from url: String, to folder: URL, token: String?) throws -> Repository {
+        _ = libgit2
+        var options = git_clone_options()
+        try check(git_clone_options_init(&options, UInt32(GIT_CLONE_OPTIONS_VERSION)), "git_clone_options_init")
+        let state = RemoteState(token: token)
+        options.fetch_opts.callbacks = try callbacks(for: state)
+        options.fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE
+        options.checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE.rawValue
+        let pointer = try "main".withCString { branch in
+            options.checkout_branch = branch
+            return try lookup("git_clone") { git_clone($0, url, folder.path, &options) }
+        }
+        withExtendedLifetime(state) {}
+        return Repository(pointer: pointer, workingDirectory: folder)
+    }
+
+    /// Every ref the remote advertises, as it stands there now, without
+    /// HEAD or the peeled `^{}` doubles of its tags. Connects, lists and
+    /// disconnects; nothing is fetched.
+    public func remoteRefs(at url: String, token: String?) throws -> [RemoteRef] {
+        let remote = try lookup("git_remote_create_anonymous") { git_remote_create_anonymous($0, pointer, url) }
+        defer { git_remote_free(remote) }
+        let state = RemoteState(token: token)
+        var callbacks = try Self.callbacks(for: state)
+        try check(git_remote_connect(remote, GIT_DIRECTION_FETCH, &callbacks, nil, nil), "git_remote_connect")
+        defer { git_remote_disconnect(remote) }
+        var heads: UnsafeMutablePointer<UnsafePointer<git_remote_head>?>?
+        var count = 0
+        try check(git_remote_ls(&heads, &count, remote), "git_remote_ls")
+        withExtendedLifetime(state) {}
+        var refs: [RemoteRef] = []
+        for index in 0..<count {
+            guard let head = heads?[index] else { continue }
+            let name = String(cString: head.pointee.name)
+            guard name != "HEAD", !name.hasSuffix("^{}") else { continue }
+            refs.append(RemoteRef(name: name, id: ObjectID(head.pointee.oid)))
+        }
+        return refs
+    }
+
+    /// Fetches exactly `refspecs` from `url`: full names on both sides, a
+    /// leading `+` to let a ref move backwards. No tags come along uninvited
+    /// and FETCH_HEAD is left alone; the refspecs say where things land.
+    /// Blocks for the length of the transfer; call it off the main thread.
+    public func fetch(from url: String, refspecs: [String], token: String?) throws {
+        let remote = try lookup("git_remote_create_anonymous") { git_remote_create_anonymous($0, pointer, url) }
+        defer { git_remote_free(remote) }
+
+        var options = git_fetch_options()
+        try check(git_fetch_options_init(&options, UInt32(GIT_FETCH_OPTIONS_VERSION)), "git_fetch_options_init")
+        let state = RemoteState(token: token)
+        options.callbacks = try Self.callbacks(for: state)
+        options.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE
+        options.update_fetchhead = 0
+        options.prune = GIT_FETCH_NO_PRUNE
+
+        var strings = refspecs.map { strdup($0) }
+        defer { strings.forEach { free($0) } }
+        try strings.withUnsafeMutableBufferPointer { buffer in
+            var array = git_strarray(strings: buffer.baseAddress, count: buffer.count)
+            try check(git_remote_fetch(remote, &array, &options, "fetch"), "git_remote_fetch")
+        }
+        withExtendedLifetime(state) {}
+    }
+
+    /// Pushes `refspecs` to `url`. A ref the remote turns away (main having
+    /// moved there, say) fails the push with the remote's reason. Blocks for
+    /// the length of the transfer; call it off the main thread on its own
     /// `Repository`.
     public func push(to url: String, refspecs: [String], token: String?) throws {
         let remote = try lookup("git_remote_create_anonymous") { git_remote_create_anonymous($0, pointer, url) }
@@ -393,18 +487,11 @@ public final class Repository {
 
         var options = git_push_options()
         try check(git_push_options_init(&options, UInt32(GIT_PUSH_OPTIONS_VERSION)), "git_push_options_init")
-        let state = PushState(token: token)
-        options.callbacks.payload = Unmanaged.passUnretained(state).toOpaque()
-        options.callbacks.credentials = { out, _, _, _, payload in
-            guard let payload else { return GIT_EAUTH.rawValue }
-            let state = Unmanaged<PushState>.fromOpaque(payload).takeUnretainedValue()
-            guard let token = state.token, !state.asked else { return GIT_EAUTH.rawValue }
-            state.asked = true
-            return git_credential_userpass_plaintext_new(out, "token", token)
-        }
+        let state = RemoteState(token: token)
+        options.callbacks = try Self.callbacks(for: state)
         options.callbacks.push_update_reference = { refname, status, payload in
             guard let status, let payload else { return 0 }
-            let state = Unmanaged<PushState>.fromOpaque(payload).takeUnretainedValue()
+            let state = Unmanaged<RemoteState>.fromOpaque(payload).takeUnretainedValue()
             let name = refname.map { String(cString: $0) } ?? "?"
             state.rejected.append("\(name): \(String(cString: status))")
             return 0
@@ -420,6 +507,53 @@ public final class Repository {
         if !state.rejected.isEmpty {
             throw GitError(operation: "git_remote_push", code: -1, message: "the remote turned away " + state.rejected.joined(separator: "; "))
         }
+    }
+
+    // MARK: - History
+
+    /// Whether `ancestor` is `descendant` itself or reachable from it.
+    public func isAncestor(_ ancestor: ObjectID, of descendant: ObjectID) throws -> Bool {
+        if ancestor == descendant { return true }
+        var commit = descendant.raw
+        var base = ancestor.raw
+        let rc = git_graph_descendant_of(pointer, &commit, &base)
+        try check(rc, "git_graph_descendant_of")
+        return rc == 1
+    }
+
+    /// How many commits `head` reaches that `base` does not; all of them
+    /// when `base` is nil.
+    public func countCommits(from head: ObjectID, excluding base: ObjectID?) throws -> Int {
+        let walk = try lookup("git_revwalk_new") { git_revwalk_new($0, pointer) }
+        defer { git_revwalk_free(walk) }
+        var from = head.raw
+        try check(git_revwalk_push(walk, &from), "git_revwalk_push")
+        if let base {
+            var hide = base.raw
+            try check(git_revwalk_hide(walk, &hide), "git_revwalk_hide")
+        }
+        var count = 0
+        var oid = git_oid()
+        while true {
+            let rc = git_revwalk_next(&oid, walk)
+            if rc == GIT_ITEROVER.rawValue { break }
+            try check(rc, "git_revwalk_next")
+            count += 1
+        }
+        return count
+    }
+
+    /// Makes the working tree and the index match the commit's tree: tracked
+    /// files are overwritten or removed, files git does not track are left
+    /// alone. Refs stay where they are; moving main is the caller's step.
+    public func checkoutTree(of commit: ObjectID) throws {
+        var oid = commit.raw
+        let object = try lookup("git_object_lookup") { git_object_lookup($0, pointer, &oid, GIT_OBJECT_COMMIT) }
+        defer { git_object_free(object) }
+        var options = git_checkout_options()
+        try check(git_checkout_options_init(&options, UInt32(GIT_CHECKOUT_OPTIONS_VERSION)), "git_checkout_options_init")
+        options.checkout_strategy = GIT_CHECKOUT_FORCE.rawValue
+        try check(git_checkout_tree(pointer, object, &options), "git_checkout_tree")
     }
 
     // MARK: - Lookups
