@@ -29,7 +29,7 @@ struct ChangesView: View {
             .padding(.vertical, 8)
             Divider()
             if model.milestones.isEmpty {
-                ContentUnavailableView("No milestone yet", systemImage: "flag", description: Text("Mark one with ⇧⌘M, and this shows what moved since."))
+                ContentUnavailableView("No milestone yet", systemImage: "flag", description: Text(Self.howToMark))
             } else if let milestone {
                 List {
                     ForEach(groups, id: \.chapter) { group in
@@ -54,6 +54,12 @@ struct ChangesView: View {
             rebuild()
         }
     }
+
+    #if os(iOS)
+    private static let howToMark = "Mark one from the binder's menu, and this shows what moved since."
+    #else
+    private static let howToMark = "Mark one with ⇧⌘M, and this shows what moved since."
+    #endif
 
     private var milestone: Milestone? {
         model.milestones.first { $0.id == chosen }
@@ -104,6 +110,28 @@ private struct ChangeRow: View {
     let scale: Int
 
     var body: some View {
+        #if os(iOS)
+        // The phone has no width for three columns: the title on one line,
+        // the counts and the bar on the next.
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .foregroundStyle(tint)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(change.scene.title)
+                    .lineLimit(1)
+                    .foregroundStyle(change.kind == .removed ? .secondary : .primary)
+                HStack(spacing: 10) {
+                    Text(counts)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    bar
+                        .frame(height: 6)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+        #else
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .foregroundStyle(tint)
@@ -120,6 +148,7 @@ private struct ChangeRow: View {
                 .frame(width: 160, height: 6)
         }
         .padding(.vertical, 2)
+        #endif
     }
 
     private var symbol: String {

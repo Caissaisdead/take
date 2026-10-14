@@ -64,3 +64,22 @@ extension ProjectModel {
         "BackupRemote:" + url.lastPathComponent
     }
 }
+
+extension ProjectModel {
+    /// A take and a milestone on the sample, once, so a posed screenshot of
+    /// the map, Compare or Since has something to show. Nothing a writer
+    /// would mind finding there.
+    func dressSampleForPose() {
+        guard milestones.isEmpty, let scene = manuscript.scenes.first else { return }
+        markMilestone(named: "First draft")
+        select(.main(scene.id))
+        guard takes.isEmpty else { return }
+        newTake(named: "Plainer")
+        if case .take = selection {
+            let text = Prose.editorForm("A rich single man needs a wife. Everyone says so.\n\n" + Prose.join(Array(Prose.paragraphsByLine(editorText).dropFirst())))
+            setEditorText(text, dirty: true)
+            save()
+        }
+        select(.main(scene.id))
+    }
+}

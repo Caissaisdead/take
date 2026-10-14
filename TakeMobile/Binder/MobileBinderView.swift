@@ -66,9 +66,13 @@ struct MobileBinderView: View {
         .navigationBarTitleDisplayMode(.large)
         .navigationSubtitle(subtitle)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button("Find", systemImage: "magnifyingglass") { showFind = true }
                     .disabled(model.manuscript.scenes.isEmpty)
+                Button("Map", systemImage: "map") { path.append(.map) }
+                    .disabled(model.manuscript.scenes.isEmpty)
+                Button("Since", systemImage: "clock.arrow.circlepath") { path.append(.since) }
+                    .disabled(model.milestones.isEmpty)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("New Scene", systemImage: "plus") { model.naming = .scene }

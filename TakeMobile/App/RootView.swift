@@ -5,6 +5,8 @@ import ManuscriptKit
 enum Route: Hashable {
     case project(UUID)
     case scene(SceneID)
+    case map
+    case since
 }
 
 /// One stack: Projects, then a project's binder, then a scene. Opens on the
@@ -24,6 +26,10 @@ struct RootView: View {
                         MobileBinderView(path: $path)
                     case .scene:
                         EditorScreen()
+                    case .map:
+                        MobileMapView(path: $path)
+                    case .since:
+                        SinceScreen(path: $path)
                     }
                 }
         }
@@ -56,18 +62,40 @@ struct RootView: View {
         guard let sample = index.entries.first(where: { $0.title == "Sample Project" }) ?? index.entries.first else { return }
         model.open(sample.folder)
         guard model.projectURL == sample.folder else { return }
+        model.dressSampleForPose()
         switch pose {
         case "projects":
             path = []
         case "binder":
             path = [.project(sample.id)]
+        case "map":
+            path = [.project(sample.id), .map]
+        case "since":
+            path = [.project(sample.id), .since]
         case "scene", "take", "compare", "versions", "scene-notes", "takes":
             guard let scene = model.manuscript.scenes.first else { return }
             model.select(.main(scene.id))
-            if pose == "take", let take = model.takes.first { model.select(.take(take)) }
+            if pose == "take" || pose == "compare", let take = model.takes.first { model.select(.take(take)) }
             path = [.project(sample.id), .scene(scene.id)]
         default:
             path = [.project(sample.id)]
         }
+    }
+}
+
+/// Since, pushed: the Mac's view with the milestone picker in its own bar.
+/// A row opens the scene compared against that milestone.
+struct SinceScreen: View {
+    @Environment(ProjectModel.self) private var model
+    @Binding var path: [Route]
+
+    var body: some View {
+        ChangesView { scene, milestone in
+            model.open(scene, against: milestone)
+            guard model.selection == .main(scene) else { return }
+            path = Array(path.prefix(1)) + [.scene(scene)]
+        }
+        .navigationTitle("Since")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
