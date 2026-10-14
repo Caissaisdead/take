@@ -203,7 +203,11 @@ final class ProjectModel {
             manuscript = try opened.manifest()
             refresh()
             Self.remember(url)
+            #if os(iOS)
+            statusLine = "Opened \(projectName)"
+            #else
             statusLine = "Opened \(url.path)"
+            #endif
             if let first = manuscript.scenes.first {
                 select(.main(first.id))
             }
@@ -211,6 +215,36 @@ final class ProjectModel {
             scoped?.stopAccessingSecurityScopedResource()
             statusLine = "Could not open \(url.lastPathComponent): \(error.localizedDescription)"
         }
+    }
+
+    /// Shuts the project after saving what is unsaved, so another can be
+    /// opened or this one removed. A failed save keeps it open.
+    func close() {
+        settle()
+        guard !isDirty else { return }
+        untangleTask?.cancel()
+        untangleTask = nil
+        untangling = nil
+        untangleError = nil
+        isUntangling = false
+        scopedURL?.stopAccessingSecurityScopedResource()
+        scopedURL = nil
+        store = nil
+        projectURL = nil
+        selection = nil
+        compareBase = .automatic
+        mapChapter = nil
+        manuscript = Manuscript(title: "")
+        takes = []
+        discarded = []
+        removed = []
+        history = []
+        milestones = []
+        sceneWords = [:]
+        totalWords = 0
+        wordsToday = 0
+        setEditorText("", dirty: false)
+        statusLine = ""
     }
 
     // MARK: - Backup

@@ -7,14 +7,21 @@ import ManuscriptKit
 extension ProjectModel {
     // MARK: - Remembering
 
-    private static let lastProjectKey = "LastProjectID"
+    nonisolated private static let lastProjectKey = "LastProjectID"
 
     /// Projects live under one root, so the id is enough to find one again.
-    static func remember(_ url: URL) {
+    nonisolated static func remember(_ url: URL) {
         UserDefaults.standard.set(url.lastPathComponent, forKey: lastProjectKey)
     }
 
-    static func lastProjectURL() -> URL? {
+    /// A removed project must not come back as the last one.
+    nonisolated static func forget(_ url: URL) {
+        if UserDefaults.standard.string(forKey: lastProjectKey) == url.lastPathComponent {
+            UserDefaults.standard.removeObject(forKey: lastProjectKey)
+        }
+    }
+
+    nonisolated static func lastProjectURL() -> URL? {
         guard let id = UserDefaults.standard.string(forKey: lastProjectKey) else { return nil }
         let url = projectsRoot.appendingPathComponent(id, isDirectory: true)
         guard FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) else { return nil }
@@ -22,7 +29,7 @@ extension ProjectModel {
     }
 
     /// Where the phone keeps its projects: `Application Support/Projects/<id>`.
-    static var projectsRoot: URL {
+    nonisolated static var projectsRoot: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return support.appendingPathComponent("Projects", isDirectory: true)
@@ -31,7 +38,7 @@ extension ProjectModel {
     // MARK: - Backup
 
     /// One token per project, so removing a project removes its secret.
-    static func tokenItem(for url: URL) -> KeychainItem {
+    nonisolated static func tokenItem(for url: URL) -> KeychainItem {
         KeychainItem(service: "com.siddharthnigam.take.backup", account: url.lastPathComponent)
     }
 
@@ -41,11 +48,11 @@ extension ProjectModel {
 
     /// The remote, kept per project in the defaults until the project index
     /// takes it over.
-    static func readRemote(for url: URL) -> String {
+    nonisolated static func readRemote(for url: URL) -> String {
         UserDefaults.standard.string(forKey: remoteKey(url)) ?? ""
     }
 
-    static func writeRemote(_ remote: String, for url: URL) {
+    nonisolated static func writeRemote(_ remote: String, for url: URL) {
         if remote.isEmpty {
             UserDefaults.standard.removeObject(forKey: remoteKey(url))
         } else {
@@ -53,7 +60,7 @@ extension ProjectModel {
         }
     }
 
-    private static func remoteKey(_ url: URL) -> String {
+    nonisolated private static func remoteKey(_ url: URL) -> String {
         "BackupRemote:" + url.lastPathComponent
     }
 }
