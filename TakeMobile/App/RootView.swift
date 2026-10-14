@@ -72,7 +72,7 @@ struct RootView: View {
             path = [.project(sample.id), .map]
         case "since":
             path = [.project(sample.id), .since]
-        case "scene", "take", "compare", "versions", "scene-notes", "takes":
+        case "scene", "take", "compare", "versions", "scene-notes", "takes", "untangle", "consent":
             guard let scene = model.manuscript.scenes.first else { return }
             model.select(.main(scene.id))
             if pose == "take" || pose == "compare", let take = model.takes.first { model.select(.take(take)) }

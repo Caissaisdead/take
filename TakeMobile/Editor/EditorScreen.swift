@@ -13,7 +13,7 @@ struct EditorScreen: View {
     @State private var flashTask: Task<Void, Never>?
 
     enum EditorSheet: Identifiable {
-        case takes, compare, versions, scene
+        case takes, compare, versions, scene, untangle
         var id: Self { self }
     }
 
@@ -68,6 +68,9 @@ struct EditorScreen: View {
                     Button("Versions", systemImage: "clock") { sheet = .versions }
                     Button("Scene", systemImage: "note.text") { sheet = .scene }
                     Divider()
+                    Button("Untangle", systemImage: "wand.and.sparkles") { sheet = .untangle }
+                    Button("Three Takes", systemImage: "sparkles") { sheet = nil; model.requestThreeTakes() }
+                    Divider()
                     Button("Takes", systemImage: "arrow.triangle.branch") { sheet = .takes }
                     Button("New Take…", systemImage: "plus") { model.naming = .take }
                     Divider()
@@ -82,6 +85,22 @@ struct EditorScreen: View {
             case .compare: MobileCompareSheet()
             case .versions: SheetHost(title: "Versions") { VersionsView() }
             case .scene: SheetHost(title: "Scene") { SceneView() }
+            case .untangle: SheetHost(title: "Untangle", detents: [.large]) { UntangleView() }
+            }
+        }
+        .sheet(isPresented: $model.consent) {
+            MobileConsentSheet()
+        }
+        .sheet(isPresented: Binding(get: { model.takeRuns != nil }, set: { if !$0 { model.cancelThreeTakes() } })) {
+            MobileThreeTakesSheet { written in
+                model.cancelThreeTakes()
+                // The Takes sheet comes up once the runs sheet has gone.
+                if written {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        sheet = .takes
+                    }
+                }
             }
         }
         .sheet(item: $model.conflict) { conflict in
@@ -96,6 +115,8 @@ struct EditorScreen: View {
             case "versions": sheet = .versions
             case "scene-notes": sheet = .scene
             case "takes": sheet = .takes
+            case "untangle": sheet = .untangle
+            case "consent": model.consent = true
             default: break
             }
         }

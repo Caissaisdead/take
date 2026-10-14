@@ -21,7 +21,7 @@ struct UntangleView: View {
                     }
                     Spacer()
                 }
-                Text("On this Mac, on Apple's model. Nothing is written into the draft.")
+                Text("On this \(Platform.deviceName), on Apple's model. Nothing is written into the draft.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -36,7 +36,7 @@ enum EngineError: LocalizedError {
 
 /// Untangle on Apple's on-device model. The window is a few thousand tokens,
 /// so a long scene is read from the top as far as it fits and the result says
-/// so. Nothing leaves the Mac.
+/// so. Nothing leaves the device.
 struct Untangler {
     /// Documented floor for the on-device model, used before the system
     /// reports a real one (it reports zero until the model has loaded).
@@ -49,6 +49,12 @@ struct Untangler {
         return reported > 0 ? reported : Self.assumedContextWindow
     }
 
+    #if os(iOS)
+    private static let settingsName = "Settings"
+    #else
+    private static let settingsName = "System Settings"
+    #endif
+
     /// Why the model cannot run, or nil when it can.
     var unavailableReason: String? {
         switch SystemLanguageModel.default.availability {
@@ -56,13 +62,13 @@ struct Untangler {
             return nil
         case .unavailable(let reason):
             switch reason {
-            case .deviceNotEligible: return "This Mac does not support Apple Intelligence."
-            case .appleIntelligenceNotEnabled: return "Apple Intelligence is turned off in System Settings."
+            case .deviceNotEligible: return "This \(Platform.deviceName) does not support Apple Intelligence."
+            case .appleIntelligenceNotEnabled: return "Apple Intelligence is turned off in \(Self.settingsName)."
             case .modelNotReady: return "Apple Intelligence is still downloading its model."
-            @unknown default: return "Apple Intelligence is unavailable on this Mac."
+            @unknown default: return "Apple Intelligence is unavailable on this \(Platform.deviceName)."
             }
         @unknown default:
-            return "Apple Intelligence is unavailable on this Mac."
+            return "Apple Intelligence is unavailable on this \(Platform.deviceName)."
         }
     }
 

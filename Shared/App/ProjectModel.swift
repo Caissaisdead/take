@@ -1019,7 +1019,7 @@ final class ProjectModel {
     func requestThreeTakes() {
         guard selection != nil, !isWritingTakes else { return }
         guard ClaudeClient.hasKey else {
-            statusLine = "Add an Anthropic API key in Settings first."
+            statusLine = "Add an Anthropic API key in \(Self.settingsName) first."
             return
         }
         if ConsentGate.isSettled {
@@ -1072,10 +1072,18 @@ final class ProjectModel {
             }
             guard !Task.isCancelled else { return }
             let made = written.count
-            statusLine = made == 3 ? "Three takes written; pick one in the map or the inspector" : "\(made) of 3 takes written"
+            statusLine = made == 3 ? "Three takes written; pick one in \(Self.takesPlace)" : "\(made) of 3 takes written"
             refresh()
         }
     }
+
+    #if os(iOS)
+    private static let settingsName = "Project Settings"
+    private static let takesPlace = "the Takes sheet"
+    #else
+    private static let settingsName = "Settings"
+    private static let takesPlace = "the map or the inspector"
+    #endif
 
     func cancelThreeTakes() {
         takesTask?.cancel()
