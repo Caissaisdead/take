@@ -202,6 +202,44 @@ taken with `screencapture -l`, and `scripts/screenshot.swift` lays it on
 the store canvas. The window is 1152×720 points so the capture is 2304×1440
 and sits on the 2560×1600 canvas unscaled.
 
+## The iPhone
+
+The phone is the same app record with iOS added as a platform, so it
+shares the name, the bundle ID, the privacy answers and the age rating.
+Its own fields:
+
+- Build: `PLATFORM=ios scripts/appstore.sh` archives the `TakeMobile`
+  scheme and exports `dist/<version>/appstore-ios/Take.ipa`; `UPLOAD=1`
+  sends it. The version and build number are the Mac's; the store keeps
+  the two platforms' builds apart.
+- Subtitle: the Mac's. Promotional text: "Your novel on your phone: read
+  it back, fix a line, keep a thought, and pull the takes you wrote on
+  the Mac."
+- Description: the Mac's, with the first paragraph replaced by
+
+      Take keeps a novel as a folder of Markdown files with its whole
+      history, and the iPhone app carries it with you. Pull a project
+      from the git remote your Mac backs up to; read, edit, make takes,
+      and back up from the phone.
+
+  and the export paragraph saying Markdown and PDF (no Word on the
+  phone). The last paragraph says "sends nothing anywhere unless you
+  ask" as on the Mac; Pull and Back Up go to the remote the writer named.
+- Screenshots: 6.9" (1320×2868), from the iPhone 17 Pro Max simulator
+  with the status bar overridden to 9:41. `-TakeShot <pose>` on the
+  phone poses `binder`, `scene`, `compare`, `takes`, `map`, `since`,
+  `settings`, and `xcrun simctl io <udid> screenshot` captures. The set,
+  in order: binder, scene, compare, takes, map, settings; files under
+  `dist/screenshots-iphone/`.
+- Review notes: the Mac's, with the phone's ways in: the sample project
+  is on the Projects screen on first launch; a scene opens from the
+  binder; the editor's menu holds Compare, Versions, Scene, Untangle,
+  Three Takes and New Take; the binder's menu holds Map, Since, Mark
+  Milestone and Project Settings, where the remote, token and API key
+  live. Pull from a remote needs a git remote and token of the writer's
+  own, as Back Up does on the Mac. Untangle needs an iPhone with Apple
+  Intelligence.
+
 ## Open decisions before submission
 
 - Pricing.
