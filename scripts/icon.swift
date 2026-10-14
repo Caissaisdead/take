@@ -1,6 +1,7 @@
 // Draws the app icon: a page of prose with one line branching into a take.
 // Run from the repository root:  swift scripts/icon.swift
-// Writes every size Xcode wants into Take/Assets.xcassets/AppIcon.appiconset.
+// Writes every size Xcode wants into Take/Assets.xcassets/AppIcon.appiconset,
+// and the iPhone's one square into TakeMobile/Assets.xcassets.
 import AppKit
 
 let out = "Take/Assets.xcassets/AppIcon.appiconset"
@@ -89,6 +90,24 @@ NSGraphicsContext.restoreGraphicsState()
 
 let png = rep.representation(using: .png, properties: [:])!
 try! png.write(to: URL(fileURLWithPath: "\(out)/icon_512x512@2x.png"))
+
+// The iPhone's icon is the tile alone, filling the square with no alpha:
+// the store refuses a transparent corner, and iOS rounds the corners itself
+// at nearly the tile's radius.
+let phoneSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+let phoneContext = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                             space: phoneSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.current = NSGraphicsContext(cgContext: phoneContext, flipped: false)
+let square = NSRect(x: 0, y: 0, width: side, height: side)
+NSGradient(starting: color(0x3B332C), ending: color(0x221D19))!.draw(in: square, angle: -90)
+let whole = NSImage(size: NSSize(width: side, height: side))
+whole.addRepresentation(rep)
+whole.draw(in: square, from: tile, operation: .sourceOver, fraction: 1)
+NSGraphicsContext.restoreGraphicsState()
+let phone = NSBitmapImageRep(cgImage: phoneContext.makeImage()!)
+let phoneOut = "TakeMobile/Assets.xcassets/AppIcon.appiconset"
+try! phone.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "\(phoneOut)/icon_1024.png"))
 
 // Every other size, and the catalog's manifest.
 let sizes: [(name: String, points: Int, scale: Int)] = [

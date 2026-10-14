@@ -225,8 +225,9 @@ Its own fields:
   and the export paragraph saying Markdown and PDF (no Word on the
   phone). The last paragraph says "sends nothing anywhere unless you
   ask" as on the Mac; Pull and Back Up go to the remote the writer named.
-- Screenshots: 6.9" (1320×2868), from the iPhone 17 Pro Max simulator
-  with the status bar overridden to 9:41. `-TakeShot <pose>` on the
+- Screenshots: the store asks for the 6.3" display, 1206×2622, from the
+  iPhone 17 Pro simulator with the status bar overridden to 9:41 (the
+  6.9" set is optional and scales from it). `-TakeShot <pose>` on the
   phone poses `binder`, `scene`, `compare`, `takes`, `map`, `since`,
   `settings`, and `xcrun simctl io <udid> screenshot` captures. The set,
   in order: binder, scene, compare, takes, map, settings; files under
