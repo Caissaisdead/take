@@ -13,6 +13,8 @@ public enum ProjectStoreError: Error, Equatable, Sendable, LocalizedError {
     case missingFile(String)
     /// A scene with this identity is in the manuscript already.
     case duplicateScene(SceneID)
+    /// Main or the remote moved between a pull and settling its divergence.
+    case pullStale
 
     public var errorDescription: String? {
         switch self {
@@ -34,6 +36,8 @@ public enum ProjectStoreError: Error, Equatable, Sendable, LocalizedError {
                 : "The manuscript names \(path), but the file is not in the draft."
         case .duplicateScene:
             return "That scene is in the manuscript already."
+        case .pullStale:
+            return "The draft moved since the pull; pull again."
         }
     }
 }
@@ -87,6 +91,19 @@ public final class ProjectStore {
     init(repository: Repository, author: Signature) {
         self.repository = repository
         self.author = author
+    }
+
+    /// Catches up with a pull made through another instance of the
+    /// repository: rereads the index and forgets everything read from main's
+    /// head. The caches are keyed by the head and the history cache walks
+    /// forward from where it stopped, so a main set somewhere else entirely
+    /// has to drop them.
+    public func reload() throws {
+        try repository.reloadIndex()
+        cachedManifest = nil
+        historyCache = [:]
+        removedCache = nil
+        dayStart = nil
     }
 
     // MARK: - Manuscript
@@ -687,7 +704,7 @@ public final class ProjectStore {
 
     /// A ref under `prefix` for `name`, numbered past any already there. A take
     /// discarded twice under one name must not overwrite the first.
-    private func freeRef(named name: String, under prefix: String) throws -> String {
+    func freeRef(named name: String, under prefix: String) throws -> String {
         let taken = Set(try repository.refs(withPrefix: prefix).map { $0.lowercased() })
         var candidate = name
         var suffix = 2
@@ -700,7 +717,7 @@ public final class ProjectStore {
 
     // MARK: - Plumbing
 
-    private func manifest(at commit: ObjectID) throws -> Manuscript {
+    func manifest(at commit: ObjectID) throws -> Manuscript {
         guard let entry = try entry(Manuscript.manifestPath, at: commit) else {
             throw ProjectStoreError.missingFile(Manuscript.manifestPath)
         }
@@ -742,11 +759,11 @@ public final class ProjectStore {
         return scene
     }
 
-    private func entry(_ path: String, at commit: ObjectID) throws -> TreeEntry? {
+    func entry(_ path: String, at commit: ObjectID) throws -> TreeEntry? {
         try repository.entry(atPath: path, inTree: try repository.commit(commit).tree)
     }
 
-    private func text(of blob: ObjectID?) throws -> String {
+    func text(of blob: ObjectID?) throws -> String {
         guard let blob else { return "" }
         return String(decoding: try repository.readBlob(blob), as: UTF8.self)
     }
@@ -857,7 +874,7 @@ public final class ProjectStore {
     }
 
     /// `base`, or the first of `base-2`, `base-3`… that `isTaken` accepts.
-    private static func unique(_ base: String, isTaken: (String) throws -> Bool) rethrows -> String {
+    static func unique(_ base: String, isTaken: (String) throws -> Bool) rethrows -> String {
         var candidate = base
         var suffix = 2
         while try isTaken(candidate) {

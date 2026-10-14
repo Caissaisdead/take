@@ -338,6 +338,17 @@ public final class Repository {
     }
 
     /// The tree the index currently describes, written to the object database.
+    /// Rereads the index from disk, dropping whatever this instance held in
+    /// memory. libgit2 keeps one index per repository object and never looks
+    /// at the file again on its own, so after another instance has checked
+    /// out a commit this one would otherwise commit the old index as the
+    /// next tree.
+    public func reloadIndex() throws {
+        let index = try openIndex()
+        defer { git_index_free(index) }
+        try check(git_index_read(index, 1), "git_index_read")
+    }
+
     public func writeIndexTree() throws -> ObjectID {
         let index = try openIndex()
         defer { git_index_free(index) }
