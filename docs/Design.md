@@ -290,6 +290,12 @@ chapters (Move is a sheet). Everything else the Mac does, the phone does.
 
 ## Building it
 
+Built, October 2026, in the order below; `Shared/` holds what both apps
+compile, `Take/` and `TakeMobile/` the halves that differ. Two things from
+above are not in the first version: "Open a folder" (a project reaches the
+phone by pulling a remote) and the iPad's layout (the phone's app is
+iPhone-only). The Mac's Word export stays the Mac's.
+
 Part-3's code, in order: `Repository.fetch` and a fast-forward `pull` in
 ManuscriptKit with the diverged-to-takes rule and tests; a `TakeMobile`
 target in `project.yml` sharing ManuscriptKit; the Projects screen and the

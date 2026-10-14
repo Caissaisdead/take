@@ -99,8 +99,16 @@ privacy policy in `docs/Privacy.md`. `scripts/screenshot.swift` lays a
 window capture on a 2560×1600 canvas for the store, and `scripts/record.sh`
 records the app walking through its typical flow for App Review.
 
+The iPhone app is the `TakeMobile` scheme, iPhone-only, the same bundle
+ID as a second platform of the Mac's App Store record. It is built the
+same way with `-destination 'generic/platform=iOS'`; the `-TakeShot`
+poses (`projects`, `binder`, `scene`, `take`, `compare`, `versions`,
+`scene-notes`, `takes`, `find`, `map`, `since`, `settings`, `untangle`,
+`consent`) run on the simulator for the store's screenshots.
+
 CI (`.github/workflows/ci.yml`) runs the package tests and a Release build
-on a macOS 26 runner for every push to main and every pull request.
+on a macOS 26 runner for every push to main and every pull request, then
+builds the iPhone app for the simulator and runs the package tests there.
 
 ### Bench
 

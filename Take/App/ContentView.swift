@@ -65,17 +65,23 @@ struct ContentView: View {
         }
         .inspector(isPresented: $showInspector) {
             VStack(spacing: 0) {
-                Picker("Inspector", selection: $inspectorTab) {
-                    ForEach(InspectorTab.allCases, id: \.self) { tab in
-                        Image(systemName: tab.symbol)
-                            .help(tab.name)
-                            .tag(tab)
+                HStack(spacing: 8) {
+                    Picker("Inspector", selection: $inspectorTab) {
+                        ForEach(InspectorTab.allCases, id: \.self) { tab in
+                            Image(systemName: tab.symbol)
+                                .help(tab.name)
+                                .tag(tab)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    // The chosen pane's name, so a new writer is never lost.
+                    Text(inspectorTab.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
                 .padding(10)
-                .help(inspectorTab.name)
                 Divider()
                 switch inspectorTab {
                 case .versions:
@@ -102,25 +108,36 @@ struct ContentView: View {
             .inspectorColumnWidth(min: 280, ideal: inspectorTab == .compare ? 460 : 300, max: 900)
         }
         .toolbar {
+            // Three groups, left to right: make, this take, views.
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("New Scene", systemImage: "plus") { model.naming = .scene }
                     .help("Add a scene after the current one (⌘N)")
-                Button("Save") { model.save() }
-                    .disabled(model.selection == nil)
-                Button("New Take") { model.naming = .take }
+                Button("Save", systemImage: "checkmark") { model.save() }
+                    .help("Save the open text now (⌘S)")
                     .disabled(model.selection == nil)
                 Button("Milestone", systemImage: "flag") { model.naming = .milestone }
                     .help("Mark the whole draft as it stands (⇧⌘M)")
                     .disabled(model.manuscript.scenes.isEmpty)
-                if model.isInTake {
-                    Button("Keep") { model.keep() }
-                    Button("Discard") { confirmDiscard = true }
-                }
                 if ProjectModel.isBenchRequested {
                     Button("Stress") { model.loadStress() }
                         .help("Load the sample scene four times over, about 20k words; not saved unless you save")
                 }
-                Toggle("Compare", isOn: compareBinding)
+            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("New Take", systemImage: "arrow.triangle.branch") { model.naming = .take }
+                    .help("Start a take of this scene from main (⇧⌘T)")
+                    .disabled(model.selection == nil)
+                if model.isInTake {
+                    Button("Keep", systemImage: "checkmark.circle") { model.keep() }
+                        .help("Make this take the scene's text on main")
+                    Button("Discard", systemImage: "xmark.circle") { confirmDiscard = true }
+                        .help("Set this take aside; it stays under Discarded")
+                }
+            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItemGroup(placement: .primaryAction) {
+                Toggle("Compare", systemImage: "doc.on.doc", isOn: compareBinding)
                     .toggleStyle(.button)
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                     .help("Compare the editor with another version (⇧⌘D)")
@@ -379,7 +396,7 @@ private struct NameSheet: View {
                 .font(.headline)
             TextField(placeholder, text: $name)
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 320)
+                .frame(width: 360)
                 .onSubmit(commit)
             HStack {
                 Spacer()
