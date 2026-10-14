@@ -928,6 +928,25 @@ final class ProjectModel {
             mainSavesSince: row.map { beads - 1 - $0 } ?? beads)
     }
 
+    /// "+120 −38 · 3 saves": a take's words against main and its own commits,
+    /// for a list that has no room for the map's cards.
+    func summary(of take: Take) -> String {
+        guard let store else { return "" }
+        do {
+            let mainText = try store.sceneText(take.scene)
+            let node = try node(for: take, against: mainText, discarded: false, row: nil, beads: 0)
+            let delta = node.delta.map { "+\($0.added) −\($0.removed)" } ?? ""
+            return "\(delta) · \(Self.count(node.saves, "save"))"
+        } catch {
+            return ""
+        }
+    }
+
+    /// The scene's words as main has them, whatever the editor shows.
+    var wordCountOnMain: Int {
+        selection.flatMap { sceneWords[$0.sceneID] } ?? 0
+    }
+
     /// Opens what a map node stands for. A discarded take only reports itself.
     func open(_ node: MapNode) {
         switch node.kind {
