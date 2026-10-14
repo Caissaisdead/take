@@ -4,6 +4,7 @@ import Testing
 
 private let opening = "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.\n\nHowever little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families.\n"
 
+#if os(macOS)
 /// Runs the system git in `directory` and returns everything it printed.
 private struct GitFailed: Error, CustomStringConvertible {
     var arguments: [String]
@@ -29,6 +30,7 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
     guard process.terminationStatus == 0 else { throw GitFailed(arguments: arguments, output: text) }
     return text
 }
+#endif
 
 @Suite struct ProjectStoreTests {
     @Test func createWritesManifestAndRootCommitOnMain() throws {
@@ -183,7 +185,9 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
                     == (try store.repository.entry(atPath: scene.path, inTree: tree)))
                 #expect(try store.sceneText(scene.id) == "\(scene.title).\n")
             }
+#if os(macOS)
             #expect(try git("status", "--porcelain", in: url) == "")
+#endif
             #expect(try store.history(of: a1.id).map(\.message) == ["Add A1"])
 
             let ghost = SceneID()
@@ -297,8 +301,10 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try store.manifest().parts.isEmpty)
             #expect(!FileManager.default.fileExists(atPath: url.appendingPathComponent(a2.path).path))
             #expect(try store.repository.commit(try store.mainHead()).message == "Remove part One")
+#if os(macOS)
             #expect(try git("status", "--porcelain", in: url) == "")
             #expect(try git("ls-files", in: url) == "manuscript.json\n")
+#endif
         }
     }
 
@@ -416,10 +422,12 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try store.sceneText(scene.id, at: first.commit) == "One.\n")
             #expect(try store.sceneText(scene.id, at: second.commit) == "One. Two.\n")
 
+#if os(macOS)
             // System git sees annotated tags with the name as the message.
             #expect(try git("tag", "-l", "-n1", "milestones/*", in: url) == "milestones/first-draft First Draft!\nmilestones/first-draft-2 first draft\n")
             #expect(try git("rev-parse", "milestones/first-draft^{commit}", in: url).trimmingCharacters(in: .whitespacesAndNewlines) == before.hex)
             #expect(try git("log", "--oneline", in: url).contains("Milestone") == false)
+#endif
         }
     }
 
@@ -577,9 +585,11 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(made[0].id == "refs/takes/\(uuid)/Mr%2E%20Bennet%27s%20reply%E2%80%A6")
             #expect(made[6].id == "refs/takes/\(uuid)/Ünïcode%20naïveté")
             #expect(Set(try store.takes(for: scene.id).map(\.name)) == Set(made.map(\.name)))
+#if os(macOS)
             // System git can list and read every one of them.
             #expect(try git("for-each-ref", "--count=100", "--format=%(refname)", "refs/takes/", in: url).split(separator: "\n").count == names.count)
             #expect(try git("rev-parse", "refs/takes/\(uuid)/Ünïcode%20naïveté", in: url).trimmingCharacters(in: .whitespacesAndNewlines) == made[6].head.hex)
+#endif
             #expect(ProjectStore.refComponent("") == "Take")
             #expect(ProjectStore.takeName(fromRef: "refs/takes/x/Take%202", prefix: "refs/takes/x/") == "Take 2")
         }
@@ -626,7 +636,9 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             guard case .kept = try store.keep(take) else { Issue.record("keep did not merge"); return }
             #expect(try Data(contentsOf: url.appendingPathComponent(scene.path)) == Data("Alt.\n".utf8))
             #expect(try Data(contentsOf: url.appendingPathComponent(other.path)) == edited)
+#if os(macOS)
             #expect(try git("status", "--porcelain", in: url) == " M \(other.path)\n")
+#endif
 
             // The same through a settled conflict, either way.
             let second = try store.saveTake(try store.createTake(for: scene.id, name: "Second"), text: "Second.\n")
@@ -662,8 +674,10 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try store.mainHead() == moved)
             #expect(try store.repository.resolve(idle.id) == nil)
             #expect(try store.takes(for: scene.id).isEmpty)
+#if os(macOS)
             #expect(try git("log", "--merges", "--oneline", in: url) == "")
             #expect(try git("status", "--porcelain", in: url) == "")
+#endif
             #expect(try store.history(of: scene.id).map(\.kind) == [.checkpoint])
 
             // Main moved on this scene: the take's text is the base, and that is still a conflict.
@@ -722,7 +736,9 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try store.sceneText(scene.id) == "Main again.\n")
             #expect(try store.repository.resolve(other.id) == nil)
             #expect(try store.takes(for: scene.id).isEmpty)
+#if os(macOS)
             #expect(try git("status", "--porcelain", in: url) == "")
+#endif
             // The scene's own history skips the record, since its text did not move.
             #expect(try store.history(of: scene.id).first?.id == later)
         }
@@ -775,6 +791,7 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
         }
     }
 
+#if os(macOS)
     @Test func backupPushesEveryRefToARemote() throws {
         try withTemporaryDirectory { url in
             let project = url.appendingPathComponent("project")
@@ -811,7 +828,9 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(throws: GitError.self) { try ProjectStore.backUp(projectAt: project, to: "file://" + bare.path, token: nil) }
         }
     }
+#endif
 
+#if os(macOS)
     @Test func systemGitReadsTheProject() throws {
         try withTemporaryDirectory { url in
             let store = try ProjectStore.create(at: url, title: "Pride and Prejudice", author: jane)
@@ -835,4 +854,5 @@ private func git(_ arguments: String..., in directory: URL) throws -> String {
             #expect(try git("show", "HEAD:\(scene.path)", in: url) == "A rich single man needs a wife.\n")
         }
     }
+#endif
 }

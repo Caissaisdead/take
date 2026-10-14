@@ -25,11 +25,15 @@ public final class Repository {
 
     /// Creates a non-bare repository at `url`, making the folder if needed.
     /// No initial commit is made and HEAD points at `refs/heads/main`.
-    public static func create(at url: URL) throws -> Repository {
+    /// Makes a repository at `url` with main as its first branch and no
+    /// commit. A bare one has no working tree; tests use it as the other
+    /// end of a push.
+    public static func create(at url: URL, bare: Bool = false) throws -> Repository {
         _ = libgit2
         var options = git_repository_init_options()
         try check(git_repository_init_options_init(&options, UInt32(GIT_REPOSITORY_INIT_OPTIONS_VERSION)), "git_repository_init_options_init")
         options.flags = GIT_REPOSITORY_INIT_MKPATH.rawValue
+        if bare { options.flags |= GIT_REPOSITORY_INIT_BARE.rawValue }
         let pointer = try "main".withCString { head in
             options.initial_head = head
             return try lookup("git_repository_init_ext") { git_repository_init_ext($0, url.path, &options) }
