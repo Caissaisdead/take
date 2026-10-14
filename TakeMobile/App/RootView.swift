@@ -61,7 +61,7 @@ struct RootView: View {
             path = []
         case "binder":
             path = [.project(sample.id)]
-        case "scene", "take":
+        case "scene", "take", "compare", "versions", "scene-notes", "takes":
             guard let scene = model.manuscript.scenes.first else { return }
             model.select(.main(scene.id))
             if pose == "take", let take = model.takes.first { model.select(.take(take)) }

@@ -6,6 +6,9 @@ import ManuscriptKit
 /// changes, a quarter second after the last keystroke in the field.
 struct FindView: View {
     @Environment(ProjectModel.self) private var model
+    /// What a tap on a hit does; the model's `reveal` unless the host says
+    /// otherwise, as the phone does to push the editor.
+    var onReveal: ((Match) -> Void)? = nil
     @State private var query = ""
     @State private var includeTakes = false
     @State private var results: [Match] = []
@@ -46,7 +49,7 @@ struct FindView: View {
                             ForEach(group.matches) { match in
                                 MatchRow(match: match, sceneTitle: model.manuscript.scene(match.scene)?.title ?? "")
                                     .contentShape(Rectangle())
-                                    .onTapGesture { model.reveal(match) }
+                                    .onTapGesture { (onReveal ?? model.reveal)(match) }
                             }
                         }
                     }

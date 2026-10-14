@@ -10,6 +10,7 @@ struct MobileBinderView: View {
     @State private var removing: ProjectModel.BinderItem?
     @State private var moving: SceneRef?
     @State private var showTargets = false
+    @State private var showFind = false
 
     var body: some View {
         List {
@@ -66,6 +67,10 @@ struct MobileBinderView: View {
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button("Find", systemImage: "magnifyingglass") { showFind = true }
+                    .disabled(model.manuscript.scenes.isEmpty)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button("New Scene", systemImage: "plus") { model.naming = .scene }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -85,6 +90,8 @@ struct MobileBinderView: View {
         }
         .namePrompt()
         .sheet(isPresented: $showTargets) { MobileTargetsSheet() }
+        .sheet(isPresented: $showFind) { FindSheet(path: $path) }
+        .onAppear { if ProjectModel.shotPose == "find" { showFind = true } }
         .sheet(item: $moving) { scene in MoveSheet(scene: scene) }
         .sheet(isPresented: Binding(get: { model.pullDivergence != nil }, set: { if !$0 { model.decidePullLater() } })) {
             PullConflictSheet()
